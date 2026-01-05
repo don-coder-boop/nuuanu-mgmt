@@ -3,307 +3,288 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>nuuanu | Brand Seeding Management</title>
-    <!-- Tailwind CSS -->
+    <title>nuuanu - Influencer Seeding Portal</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide-react"></script>
+    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-        
-        body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            background-color: #ffffff;
-            color: #1a1a1a;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        .aspect-lookbook { aspect-ratio: 1 / 1.5; }
-        .aspect-product { aspect-ratio: 2 / 3; }
-
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #000; overflow-x: hidden; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-        .animate-fade-in {
-            animation: fadeIn 0.5s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .transition-all { transition: all 0.3s ease-in-out; }
-        
-        /* Custom Checkbox */
-        .accent-black {
-            accent-color: #000;
-        }
+        .aspect-lookbook { aspect-ratio: 2 / 3; }
+        .aspect-product { aspect-ratio: 3 / 4; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.6s ease-out forwards; }
     </style>
-    <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom": "https://esm.sh/react-dom@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-    "lucide-react": "https://esm.sh/lucide-react@0.344.0",
-    "recharts": "https://esm.sh/recharts@2.12.2",
-    "clsx": "https://esm.sh/clsx@2.1.0",
-    "tailwind-merge": "https://esm.sh/tailwind-merge@2.2.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/"
-  }
-}
-</script>
 </head>
 <body>
     <div id="root"></div>
 
-    <!-- Babel for JSX transformation in the browser -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-    <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-        import { createRoot } from 'react-dom/client';
-        import { 
-            ShoppingBag, X, ChevronLeft, ChevronRight, ArrowLeft, 
-            Settings, Package, Truck, BarChart3, Plus, Trash2, 
-            Download, Copy, Save, LogOut, ChevronDown, ArrowUpDown, 
-            Upload, FileText, Key, CheckCircle 
-        } from 'lucide-react';
-        import { 
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useRef } = React;
+        const { createRoot } = ReactDOM;
+        const { 
+            X, Plus, ShoppingBag, ChevronRight, ChevronDown, 
+            Save, Trash2, LogOut, Package, Truck, BarChart3, 
+            Settings, Upload, FileText, Download, Copy, ArrowUpDown, Key, RefreshCcw
+        } = lucide;
+        const { 
             BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
             ResponsiveContainer, Cell 
-        } from 'recharts';
+        } = Recharts;
 
-        // --- Constants & Initial Data ---
+        // --- Utils: Image to Base64 ---
+        const fileToBase64 = (file) => {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.readAsDataURL(file);
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = error => reject(error);
+            });
+        };
+
+        // --- Constants ---
         const INITIAL_COLLECTIONS = [
             {
-                id: '25fw-id',
-                name: '25FW Collection',
-                logoUrl: '',
-                accessCodes: [
-                    { code: 'VIP25', limit: 3 },
-                    { code: 'GUEST', limit: 1 }
-                ],
-                descriptionTitle: '25FW: THE NEW ERA',
-                descriptionBody: 'Exploring the boundaries of minimal architecture through wearable art. Our Fall/Winter 2025 collection focuses on structured silhouettes and sustainable materials.',
-                lookbook: [
-                    { id: 'lb1', url: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=800&q=80' },
-                    { id: 'lb2', url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80' },
-                    { id: 'lb3', url: 'https://images.unsplash.com/photo-1529139513055-1197978913e6?auto=format&fit=crop&w=800&q=80' },
-                    { id: 'lb4', url: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=800&q=80' }
-                ],
-                products: [
-                    {
-                        id: 'p1',
-                        name: 'Structured Wool Coat',
-                        price: 450000,
-                        options: ['1', '2'],
-                        summary: 'A signature piece with architectural shoulders.<br>100% Premium Wool.',
-                        images: ['https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=600&q=80']
-                    }
-                ],
-                orders: []
+                id: '25fw-seeding',
+                name: '25FW COLLECTION',
+                accessCodes: [{ code: 'NUUANU25', limit: 3 }],
+                lookbook: [],
+                products: [],
+                orders: [],
+                descriptionTitle: 'Welcome, nuuanu girls',
+                descriptionBody: '25FW 시즌 시딩을 위한 셀렉션 페이지입니다.',
+                logoUrl: ''
             }
         ];
 
-        // --- Helper Components ---
-        const InputField = ({ label, required, value, onChange, placeholder = "" }) => (
-            <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">
-                    {label} {required && '*'}
+        // --- Shared Components ---
+        const InputField = ({ label, value, onChange, type = "text", required = false }) => (
+            <div className="space-y-1.5 w-full">
+                <label className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">
+                    {label} {required && <span className="text-black">*</span>}
                 </label>
                 <input 
-                    type="text" 
-                    value={value || ''}
-                    placeholder={placeholder}
+                    type={type} 
+                    value={value} 
                     onChange={e => onChange(e.target.value)}
-                    className="w-full border-b border-gray-200 py-2 focus:outline-none focus:border-black transition-colors text-sm"
+                    className="w-full border-b border-gray-200 py-2 focus:outline-none focus:border-black transition-colors bg-transparent text-sm uppercase"
                 />
             </div>
         );
 
-        // --- Page Components ---
+        // --- Page: Login ---
         const LoginPage = ({ onLogin, onReset }) => {
             const [code, setCode] = useState('');
             const [error, setError] = useState(false);
-            const [isRecovery, setIsRecovery] = useState(false);
-            const [recoveryPhrase, setRecoveryPhrase] = useState('');
-            const [recoveryMsg, setRecoveryMsg] = useState('');
+            const [showReset, setShowReset] = useState(false);
+            const [phrase, setPhrase] = useState('');
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (onLogin(code)) {
+                    setError(false);
+                } else {
+                    setError(true);
+                    setTimeout(() => setError(false), 2000);
+                }
+            };
 
             return (
-                <div className="min-h-screen flex flex-col items-center justify-center bg-white px-4 animate-fade-in">
-                    <div className="w-full max-w-sm text-center">
-                        <h1 className="text-2xl font-light tracking-[0.2em] mb-12 uppercase italic">nuuanu</h1>
-                        {!isRecovery ? (
-                            <form onSubmit={(e) => { e.preventDefault(); if(!onLogin(code)) setError(true); }} className="space-y-6">
-                                <input 
-                                    type="text" placeholder="ACCESS CODE" value={code}
-                                    onChange={e => { setCode(e.target.value); setError(false); }}
-                                    className="w-full border-b border-gray-300 py-2 text-center focus:outline-none focus:border-black uppercase tracking-widest text-sm"
-                                />
-                                {error && <p className="text-red-500 text-[10px] uppercase tracking-widest mt-2">Invalid access code</p>}
-                                <button type="submit" className="w-full bg-black text-white py-4 text-xs tracking-[0.3em] font-medium uppercase hover:bg-zinc-800 transition-colors">Enter</button>
-                                <button type="button" onClick={() => setIsRecovery(true)} className="text-[10px] uppercase tracking-widest text-gray-400 mt-4 underline decoration-gray-200">Forgot admin password?</button>
+                <div className="min-h-screen flex items-center justify-center bg-white px-6">
+                    <div className="w-full max-w-sm space-y-12 text-center animate-fade-in">
+                        <div className="space-y-4">
+                            <h1 className="text-3xl font-light italic tracking-[0.3em] uppercase">nuuanu</h1>
+                            <p className="text-[10px] tracking-[0.4em] text-gray-400 uppercase">Seeding Portal</p>
+                        </div>
+
+                        {!showReset ? (
+                            <form onSubmit={handleSubmit} className="space-y-8">
+                                <div className="space-y-4">
+                                    <input 
+                                        type="text" 
+                                        placeholder="ENTER ACCESS CODE"
+                                        value={code}
+                                        onChange={e => setCode(e.target.value.toUpperCase())}
+                                        className={`w-full text-center border-b py-4 focus:outline-none tracking-[0.5em] text-sm transition-all ${error ? 'border-red-500' : 'border-gray-200 focus:border-black'}`}
+                                    />
+                                    {error && <p className="text-[9px] text-red-500 uppercase tracking-widest">Invalid access code</p>}
+                                </div>
+                                <button className="w-full bg-black text-white py-4 text-[10px] tracking-[0.3em] uppercase hover:bg-zinc-800 transition-colors">Enter</button>
+                                
+                                <button 
+                                    type="button"
+                                    onClick={() => setShowReset(true)}
+                                    className="block w-full text-[9px] text-gray-300 uppercase tracking-widest hover:text-black transition-colors"
+                                >
+                                    Forgot Admin Password?
+                                </button>
                             </form>
                         ) : (
-                            <form onSubmit={(e) => { e.preventDefault(); if(onReset(recoveryPhrase)) { setRecoveryMsg('Password reset to ADMIN.'); setTimeout(()=>setIsRecovery(false), 2000); } else setRecoveryMsg('Incorrect phrase.'); }} className="space-y-6">
+                            <div className="space-y-6 animate-fade-in">
+                                <p className="text-[10px] text-gray-400 uppercase tracking-widest leading-loose">Enter recovery phrase to reset admin password to "ADMIN"</p>
                                 <input 
-                                    type="text" placeholder="RECOVERY PHRASE" value={recoveryPhrase}
-                                    onChange={e => setRecoveryPhrase(e.target.value)}
-                                    className="w-full border-b border-gray-300 py-2 text-center focus:outline-none focus:border-black uppercase tracking-widest text-sm"
+                                    type="text"
+                                    placeholder="RECOVERY PHRASE"
+                                    value={phrase}
+                                    onChange={e => setPhrase(e.target.value)}
+                                    className="w-full text-center border-b py-4 focus:outline-none tracking-[0.2em] text-sm border-black"
                                 />
-                                {recoveryMsg && <p className="text-[10px] uppercase tracking-widest">{recoveryMsg}</p>}
-                                <button type="submit" className="w-full bg-black text-white py-4 text-xs tracking-[0.3em] font-medium uppercase">Reset Access</button>
-                                <button type="button" onClick={() => setIsRecovery(false)} className="text-[10px] uppercase tracking-widest text-gray-400">Back</button>
-                            </form>
+                                <div className="flex gap-4">
+                                    <button onClick={() => setShowReset(false)} className="flex-1 border py-3 text-[10px] uppercase tracking-widest">Back</button>
+                                    <button onClick={() => { if(onReset(phrase)) setShowReset(false); else alert('Incorrect Phrase'); }} className="flex-1 bg-black text-white py-3 text-[10px] uppercase tracking-widest">Reset</button>
+                                </div>
+                            </div>
                         )}
                     </div>
                 </div>
             );
         };
 
+        // --- Page: Influencer ---
         const InfluencerPage = ({ collection, limit, onLogout, onOrderSubmit }) => {
-            const [view, setView] = useState('browse');
+            const [view, setView] = useState('shop');
             const [cart, setCart] = useState([]);
-            const [selectedProduct, setSelectedProduct] = useState(null);
-            const [tempSize, setTempSize] = useState(null);
-            const [lookbookIdx, setLookbookIdx] = useState(0);
             const [formData, setFormData] = useState({ instagramId: '', name: '', phone: '', address: '', message: '', agreed: false });
 
-            const handleConfirmAddToCart = () => {
-                if (cart.length >= limit) return alert(`You can select up to ${limit} products.`);
-                setCart([...cart, { product: selectedProduct, size: tempSize }]);
-                setTempSize(null);
-                setSelectedProduct(null);
-                setView('browse');
+            const addToCart = (product, size) => {
+                if (cart.length >= limit) {
+                    alert(`Maximum ${limit} items allowed.`);
+                    return;
+                }
+                setCart([...cart, { product, size }]);
             };
 
-            const isMobile = window.innerWidth < 768;
-
             return (
-                <div className="min-h-screen bg-white">
-                    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b border-gray-100">
-                        <div className="w-10"></div>
-                        {collection.logoUrl ? <img src={collection.logoUrl} className="h-6 object-contain" /> : <h1 className="text-xl font-light tracking-[0.2em] italic uppercase">nuuanu</h1>}
-                        <div className="flex items-center gap-4">
-                            <button onClick={() => setView('cart')} className="relative p-2">
-                                <ShoppingBag size={20} />
-                                {cart.length > 0 && <span className="absolute top-0 right-0 bg-black text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{cart.length}</span>}
+                <div className="min-h-screen bg-white pb-20">
+                    {/* Header */}
+                    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-50 px-6 py-6 flex justify-between items-center">
+                        <h1 className="text-lg font-light italic tracking-widest uppercase cursor-pointer" onClick={() => setView('shop')}>
+                            {collection.logoUrl ? <img src={collection.logoUrl} className="h-6" /> : 'nuuanu'}
+                        </h1>
+                        <div className="flex items-center gap-6">
+                            <button onClick={() => setView('cart')} className="relative flex items-center gap-2">
+                                <ShoppingBag size={18} />
+                                <span className="text-[10px] font-bold">{cart.length}/{limit}</span>
                             </button>
-                            <button onClick={onLogout} className="text-[10px] uppercase font-medium tracking-widest">Logout</button>
+                            <button onClick={onLogout} className="text-gray-400 hover:text-black transition-colors"><LogOut size={16} /></button>
                         </div>
                     </header>
 
-                    {view === 'browse' && (
-                        <main className="max-w-6xl mx-auto pb-20 animate-fade-in">
-                            <section className="relative px-0 md:px-4 py-8">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-0 overflow-hidden">
-                                    <div className="hidden md:block">
-                                        <img src={collection.lookbook[lookbookIdx]?.url} className="w-full aspect-lookbook object-cover" />
-                                    </div>
-                                    <div className="w-full">
-                                        <img src={collection.lookbook[isMobile ? lookbookIdx : (lookbookIdx + 1 < collection.lookbook.length ? lookbookIdx + 1 : 0)]?.url} className="w-full aspect-lookbook object-cover" />
-                                    </div>
-                                </div>
-                                <button onClick={() => setLookbookIdx(p => Math.max(0, p - (isMobile ? 1 : 2)))} className="absolute left-6 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"><ChevronLeft size={48} /></button>
-                                <button onClick={() => setLookbookIdx(p => (p + (isMobile ? 1 : 2) >= collection.lookbook.length ? 0 : p + (isMobile ? 1 : 2)))} className="absolute right-6 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"><ChevronRight size={48} /></button>
+                    {view === 'shop' && (
+                        <main className="max-w-6xl mx-auto px-6 py-12 space-y-24 animate-fade-in">
+                            {/* Hero */}
+                            <section className="text-center space-y-6 max-w-2xl mx-auto">
+                                <h2 className="text-2xl font-light uppercase tracking-[0.2em]">{collection.descriptionTitle}</h2>
+                                <p className="text-xs text-gray-500 leading-relaxed font-light whitespace-pre-wrap">{collection.descriptionBody}</p>
                             </section>
 
-                            <section className="text-center px-6 py-20 max-w-2xl mx-auto">
-                                <h2 className="text-2xl font-light uppercase tracking-widest mb-6">{collection.descriptionTitle}</h2>
-                                <p className="text-sm text-gray-500 leading-relaxed font-light">{collection.descriptionBody}</p>
-                            </section>
-
-                            <section className="px-4 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-12">
-                                {collection.products.map(p => (
-                                    <div key={p.id} onClick={() => { setSelectedProduct(p); setView('detail'); }} className="group cursor-pointer">
-                                        <div className="aspect-product overflow-hidden bg-gray-50 mb-4">
-                                            <img src={p.images[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                            {/* Lookbook */}
+                            {collection.lookbook.length > 0 && (
+                                <section className="grid grid-cols-2 md:grid-cols-4 gap-4 overflow-x-auto no-scrollbar">
+                                    {collection.lookbook.map(img => (
+                                        <div key={img.id} className="aspect-lookbook overflow-hidden bg-gray-50">
+                                            <img src={img.url} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" />
                                         </div>
-                                        <h3 className="text-xs font-medium uppercase tracking-wider">{p.name}</h3>
-                                        <p className="text-[10px] text-gray-400 uppercase">₩{p.price.toLocaleString()}</p>
+                                    ))}
+                                </section>
+                            )}
+
+                            {/* Products */}
+                            <section className="grid grid-cols-1 md:grid-cols-3 gap-y-20 gap-x-12">
+                                {collection.products.map(product => (
+                                    <div key={product.id} className="space-y-6 group">
+                                        <div className="aspect-product overflow-hidden bg-gray-50 relative">
+                                            {product.images?.[0] ? (
+                                                <img src={product.images[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-300 uppercase">No Image</div>
+                                            )}
+                                        </div>
+                                        <div className="space-y-4">
+                                            <div className="flex justify-between items-start">
+                                                <h3 className="text-xs font-medium uppercase tracking-widest">{product.name}</h3>
+                                                <p className="text-[10px] text-gray-400 uppercase">{product.summary}</p>
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                {product.options.map(size => (
+                                                    <button 
+                                                        key={size}
+                                                        onClick={() => addToCart(product, size)}
+                                                        className="px-4 py-2 border border-gray-100 text-[10px] uppercase hover:border-black transition-all"
+                                                    >
+                                                        Select {size}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </div>
                                 ))}
                             </section>
                         </main>
                     )}
 
-                    {view === 'detail' && selectedProduct && (
-                        <div className="fixed inset-0 z-[60] bg-white overflow-y-auto animate-fade-in">
-                            <button onClick={() => { setView('browse'); setTempSize(null); }} className="fixed top-6 right-6 p-2 z-[70] bg-white/50 rounded-full hover:bg-white"><X size={24} /></button>
-                            <div className="flex flex-col md:flex-row min-h-screen">
-                                <div className="w-full md:w-1/2 space-y-4 p-4">
-                                    {selectedProduct.images.map((img, i) => <img key={i} src={img} className="w-full aspect-product object-cover" />)}
-                                </div>
-                                <div className="w-full md:w-1/2 p-10 md:sticky md:top-0 md:h-screen flex flex-col justify-center">
-                                    <div className="max-w-md mx-auto w-full space-y-8">
-                                        <h2 className="text-2xl font-light uppercase tracking-widest">{selectedProduct.name}</h2>
-                                        <div className="text-sm text-gray-600 leading-relaxed font-light" dangerouslySetInnerHTML={{ __html: selectedProduct.summary }} />
-                                        <div className="space-y-4">
-                                            <p className="text-[10px] uppercase tracking-widest font-bold">Select Size</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                {selectedProduct.options.map(opt => (
-                                                    <button key={opt} onClick={() => setTempSize(opt)} className={`px-6 py-3 border text-xs tracking-widest uppercase transition-colors ${tempSize === opt ? 'border-black bg-black text-white' : 'border-gray-200 hover:border-black'}`}>{opt}</button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <button 
-                                            onClick={handleConfirmAddToCart} 
-                                            disabled={!tempSize}
-                                            className="w-full bg-black text-white py-5 text-xs tracking-[0.3em] font-medium disabled:bg-gray-100 uppercase transition-all"
-                                        >Add to Bag</button>
-                                        {cart.length >= limit && <p className="text-[10px] text-red-500 uppercase tracking-widest text-center">You can select up to {limit} products.</p>}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
                     {view === 'cart' && (
-                        <div className="min-h-screen p-6 max-w-4xl mx-auto animate-fade-in">
-                            <div className="flex justify-between items-center mb-12">
-                                <button onClick={() => setView('browse')} className="flex items-center gap-2 text-[10px] uppercase tracking-widest hover:text-gray-400 transition-colors"><ArrowLeft size={14} /> Back</button>
-                                <h2 className="text-xl font-light uppercase tracking-widest">Bag ({cart.length}/{limit})</h2>
-                                <div className="w-10"></div>
-                            </div>
-                            <div className="space-y-8 mb-20">
+                        <div className="max-w-2xl mx-auto px-6 py-20 space-y-16 animate-fade-in">
+                            <h2 className="text-xs font-bold uppercase tracking-[0.3em] border-b pb-6 text-center">Your Selection</h2>
+                            
+                            <div className="space-y-6">
                                 {cart.map((item, i) => (
-                                    <div key={i} className="flex gap-6 border-b border-gray-100 pb-8 items-center">
-                                        <img src={item.product.images[0]} className="w-24 aspect-product object-cover bg-gray-50" />
-                                        <div className="flex-1"><h3 className="text-xs font-medium uppercase tracking-wider">{item.product.name}</h3><p className="text-[10px] text-gray-400 uppercase">Size: {item.size}</p></div>
-                                        <button onClick={() => setCart(cart.filter((_, idx)=>idx!==i))} className="text-gray-300 hover:text-black transition-colors"><X size={18} /></button>
+                                    <div key={i} className="flex gap-6 items-center border-b border-gray-50 pb-6">
+                                        <div className="w-16 aspect-product bg-gray-50 overflow-hidden">
+                                            {item.product.images?.[0] && <img src={item.product.images[0]} className="w-full h-full object-cover" />}
+                                        </div>
+                                        <div className="flex-1">
+                                            <h3 className="text-xs font-medium uppercase tracking-widest">{item.product.name}</h3>
+                                            <p className="text-[10px] text-gray-400 uppercase">Size: {item.size}</p>
+                                        </div>
+                                        <button onClick={() => setCart(cart.filter((_, idx) => idx !== i))} className="text-gray-300 hover:text-black transition-colors">
+                                            <X size={18} />
+                                        </button>
                                     </div>
                                 ))}
                                 {cart.length === 0 && <p className="text-center py-20 text-xs text-gray-400 uppercase tracking-widest">Bag is empty</p>}
                             </div>
+
                             {cart.length > 0 && (
                                 <div className="space-y-12 animate-fade-in">
-                                    <h3 className="text-xs font-bold uppercase tracking-widest border-b border-black pb-4">Delivery</h3>
+                                    <h3 className="text-xs font-bold uppercase tracking-widest border-b border-black pb-4">Delivery Information</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                         <InputField label="Instagram ID" required value={formData.instagramId} onChange={v => setFormData({...formData, instagramId: v})} />
                                         <InputField label="Name" required value={formData.name} onChange={v => setFormData({...formData, name: v})} />
                                         <InputField label="Phone" required value={formData.phone} onChange={v => setFormData({...formData, phone: v})} />
                                         <InputField label="Address" required value={formData.address} onChange={v => setFormData({...formData, address: v})} />
-                                        <InputField label="Message" value={formData.message} onChange={v => setFormData({...formData, message: v})} />
+                                        <div className="md:col-span-2">
+                                            <InputField label="Message (Optional)" value={formData.message} onChange={v => setFormData({...formData, message: v})} />
+                                        </div>
                                     </div>
                                     <div className="space-y-6">
                                         <label className="flex items-start gap-3 cursor-pointer group">
                                             <input type="checkbox" checked={formData.agreed} onChange={e => setFormData({...formData, agreed: e.target.checked})} className="mt-1 accent-black"/>
-                                            <span className="text-[10px] text-gray-500 uppercase leading-relaxed font-light tracking-widest">*재고 상황 등에 따라 일부 내용이 달라질 수 있으며, 올려주신 콘텐츠는 브랜드 소개나 홍보에 활용될 수 있습니다.</span>
+                                            <span className="text-[10px] text-gray-500 uppercase leading-relaxed tracking-widest font-light">
+                                                * 재고 상황 등에 따라 일부 내용이 달라질 수 있으며, 올려주신 콘텐츠는 브랜드 소개나 홍보에 활용될 수 있습니다.
+                                            </span>
                                         </label>
                                         <button 
                                             onClick={() => {
                                                 const orders = cart.map(item => ({
                                                     id: Math.random().toString(36).substr(2, 9),
-                                                    status: 'Preparing', date: new Date().toLocaleDateString(),
-                                                    ...formData, productName: item.product.name, size: item.size
+                                                    status: 'Preparing', 
+                                                    date: new Date().toLocaleDateString(),
+                                                    ...formData, 
+                                                    productName: item.product.name, 
+                                                    size: item.size
                                                 }));
                                                 onOrderSubmit(orders);
                                                 setView('success');
                                             }} 
                                             disabled={!formData.agreed || !formData.instagramId || !formData.name || !formData.phone || !formData.address}
-                                            className="w-full bg-black text-white py-6 text-xs tracking-[0.3em] font-medium disabled:bg-gray-100 uppercase"
-                                        >Submit Order</button>
+                                            className="w-full bg-black text-white py-6 text-xs tracking-[0.3em] font-medium disabled:bg-gray-100 uppercase transition-all"
+                                        >
+                                            Submit Order
+                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -311,10 +292,12 @@
                     )}
 
                     {view === 'success' && (
-                        <div className="min-h-screen flex items-center justify-center text-center px-6">
+                        <div className="min-h-[80vh] flex items-center justify-center text-center px-6">
                             <div className="max-w-md space-y-8 animate-fade-in">
-                                <h2 className="text-xl font-light italic leading-relaxed">Thank you, nuuanu girl!<br/>We love having you as part of our journey ✨</h2>
-                                <button onClick={onLogout} className="px-12 py-4 border border-black text-[10px] uppercase tracking-[0.3em]">Exit</button>
+                                <h2 className="text-xl font-light italic leading-relaxed uppercase tracking-widest">
+                                    Thank you!<br/>We love having you as part of our journey ✨
+                                </h2>
+                                <button onClick={onLogout} className="px-12 py-4 border border-black text-[10px] uppercase tracking-[0.3em] hover:bg-black hover:text-white transition-all">Exit</button>
                             </div>
                         </div>
                     )}
@@ -322,7 +305,8 @@
             );
         };
 
-        const AdminDashboard = ({ collections, adminConfig, onUpdateAdminConfig, onUpdateCollection, onAddCollection, onLogout }) => {
+        // --- Dashboard Components ---
+        const AdminDashboard = ({ collections, adminConfig, onUpdateAdminConfig, onUpdateCollection, onAddCollection, onDeleteCollection, onLogout }) => {
             const [activeColId, setActiveColId] = useState(null);
             const [tab, setTab] = useState('Settings');
             const [isCreating, setIsCreating] = useState(false);
@@ -334,23 +318,42 @@
 
             if (!activeColId) return (
                 <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6 animate-fade-in">
-                    <div className="w-full max-w-xl bg-white shadow-sm p-12 space-y-12">
-                        <div className="flex justify-between items-center"><h1 className="text-xl font-light tracking-[0.2em] uppercase italic">nuuanu Admin</h1><button onClick={onLogout} className="text-gray-400 hover:text-black transition-colors"><LogOut size={18} /></button></div>
+                    <div className="w-full max-w-xl bg-white shadow-xl p-12 space-y-12 rounded-sm border border-gray-100">
+                        <div className="flex justify-between items-center border-b pb-6">
+                            <h1 className="text-xl font-light tracking-[0.2em] uppercase italic">nuuanu Admin</h1>
+                            <button onClick={onLogout} className="text-gray-400 hover:text-black transition-colors"><LogOut size={18} /></button>
+                        </div>
                         <div className="space-y-4">
-                            <h2 className="text-xs font-bold uppercase tracking-[0.2em] border-b pb-4">Select Collection</h2>
-                            {collections.map(c => (
-                                <button key={c.id} onClick={() => setActiveColId(c.id)} className="w-full text-left p-6 border border-gray-100 hover:border-black transition-all flex justify-between items-center group">
-                                    <span className="text-sm font-medium uppercase tracking-widest">{c.name}</span>
-                                    <span className="text-[10px] text-gray-400 group-hover:text-black font-bold">{c.orders.length} ORDERS</span>
-                                </button>
-                            ))}
+                            <h2 className="text-[10px] font-bold uppercase tracking-[0.2em] text-gray-400">Select Collection</h2>
+                            <div className="space-y-2">
+                                {collections.map(c => (
+                                    <div key={c.id} className="flex gap-2">
+                                        <button onClick={() => setActiveColId(c.id)} className="flex-1 text-left p-6 border border-gray-100 hover:border-black transition-all flex justify-between items-center group">
+                                            <span className="text-sm font-medium uppercase tracking-widest">{c.name}</span>
+                                            <span className="text-[10px] text-gray-400 group-hover:text-black font-bold">{c.orders.length} ORDERS</span>
+                                        </button>
+                                        <button 
+                                            onClick={() => { if(confirm('Delete collection?')) onDeleteCollection(c.id); }}
+                                            className="px-4 border border-gray-100 hover:border-red-500 hover:text-red-500 transition-all"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
                             {isCreating ? (
                                 <div className="p-6 border border-black space-y-4 animate-fade-in">
                                     <input autoFocus type="text" placeholder="Collection Name (e.g. 25FW)" value={newColName} onChange={e=>setNewColName(e.target.value)} className="w-full border-b py-2 focus:outline-none uppercase text-sm tracking-widest"/>
-                                    <div className="flex gap-2"><button onClick={() => { onAddCollection({ id: Math.random().toString(36).substr(2,9), name: newColName, accessCodes: [], lookbook: [], products: [], orders: [], descriptionTitle: '', descriptionBody: '' }); setIsCreating(false); setNewColName(''); }} className="flex-1 bg-black text-white py-3 text-[10px] uppercase">Create</button><button onClick={()=>setIsCreating(false)} className="px-6 border py-3 text-[10px] uppercase">Cancel</button></div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => { onAddCollection({ id: Math.random().toString(36).substr(2,9), name: newColName, accessCodes: [], lookbook: [], products: [], orders: [], descriptionTitle: '', descriptionBody: '' }); setIsCreating(false); setNewColName(''); }} className="flex-1 bg-black text-white py-3 text-[10px] uppercase tracking-widest">Create</button>
+                                        <button onClick={()=>setIsCreating(false)} className="px-6 border py-3 text-[10px] uppercase tracking-widest">Cancel</button>
+                                    </div>
                                 </div>
                             ) : (
-                                <button onClick={()=>setIsCreating(true)} className="w-full border border-dashed p-6 text-gray-400 hover:border-black hover:text-black transition-all flex items-center justify-center gap-2"><Plus size={16} /><span className="text-xs uppercase tracking-widest">Create New</span></button>
+                                <button onClick={()=>setIsCreating(true)} className="w-full border border-dashed p-6 text-gray-300 hover:border-black hover:text-black transition-all flex items-center justify-center gap-2">
+                                    <Plus size={16} />
+                                    <span className="text-xs uppercase tracking-widest">Create New Collection</span>
+                                </button>
                             )}
                         </div>
                     </div>
@@ -360,13 +363,16 @@
             return (
                 <div className="min-h-screen bg-[#fafafa] flex">
                     <aside className="w-64 bg-white border-r fixed inset-y-0 p-4 space-y-8 shadow-sm">
-                        <div className="p-4 text-center border-b"><h1 className="text-sm font-light italic uppercase tracking-[0.2em]">nuuanu</h1><span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Admin</span></div>
+                        <div className="p-4 text-center border-b">
+                            <h1 className="text-sm font-light italic uppercase tracking-[0.2em]">nuuanu</h1>
+                            <span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Manager</span>
+                        </div>
                         <nav className="space-y-1">
                             {[
-                                { id: 'Settings', icon: Settings, label: 'Settings' },
+                                { id: 'Settings', icon: Settings, label: 'Portal Setup' },
                                 { id: 'Products', icon: Package, label: 'Products' },
-                                { id: 'Shipping', icon: Truck, label: 'Shipping' },
-                                { id: 'Report', icon: BarChart3, label: 'Report' }
+                                { id: 'Shipping', icon: Truck, label: 'Orders' },
+                                { id: 'Report', icon: BarChart3, label: 'Analytics' }
                             ].map(item => (
                                 <button key={item.id} onClick={()=>setTab(item.id)} className={`w-full flex items-center gap-3 p-4 rounded-lg text-[10px] font-bold uppercase tracking-[0.15em] transition-all ${tab===item.id ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:bg-gray-50 hover:text-black'}`}>
                                     <item.icon size={18} /> {item.label}
@@ -374,17 +380,24 @@
                             ))}
                         </nav>
                         <div className="absolute bottom-4 left-4 right-4 space-y-2">
-                            <button onClick={()=>setActiveColId(null)} className="w-full flex items-center gap-3 p-4 text-[10px] uppercase text-gray-400 hover:text-black tracking-widest"><ChevronDown size={14} className="rotate-90"/> Switch Col</button>
-                            <button onClick={onLogout} className="w-full flex items-center gap-3 p-4 text-[10px] uppercase text-red-400 hover:text-red-600 tracking-widest"><LogOut size={14}/> Logout</button>
+                            <button onClick={()=>setActiveColId(null)} className="w-full flex items-center gap-3 p-4 text-[10px] uppercase text-gray-400 hover:text-black tracking-widest">
+                                <ChevronDown size={14} className="rotate-90"/> Switch Collection
+                            </button>
+                            <button onClick={onLogout} className="w-full flex items-center gap-3 p-4 text-[10px] uppercase text-red-400 hover:text-red-600 tracking-widest">
+                                <LogOut size={14}/> Logout
+                            </button>
                         </div>
                     </aside>
                     <main className="flex-1 ml-64 p-12">
                         <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
-                            <div className="flex justify-between items-end">
-                                <div><p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">{tab}</p><h2 className="text-2xl font-light uppercase tracking-[0.2em]">{activeCol.name}</h2></div>
+                            <div className="flex justify-between items-end border-b pb-8">
+                                <div>
+                                    <p className="text-[10px] uppercase tracking-widest text-gray-400 mb-2 font-bold">{tab}</p>
+                                    <h2 className="text-3xl font-light uppercase tracking-[0.2em]">{activeCol.name}</h2>
+                                </div>
                                 {msg && <div className={`px-6 py-2 rounded-full text-[10px] uppercase tracking-widest animate-fade-in ${msg.type==='success'?'bg-black text-white':'bg-red-500 text-white'}`}>{msg.text}</div>}
                             </div>
-                            <div className="bg-white p-10 shadow-sm min-h-[600px] rounded-sm">
+                            <div className="bg-white p-10 shadow-sm min-h-[600px] rounded-sm border border-gray-100">
                                 {tab==='Settings' && <SettingsTab collection={activeCol} adminConfig={adminConfig} onUpdateAdminConfig={onUpdateAdminConfig} onUpdate={onUpdateCollection} showMsg={showMsg}/>}
                                 {tab==='Products' && <ProductsTab collection={activeCol} onUpdate={onUpdateCollection} showMsg={showMsg}/>}
                                 {tab==='Shipping' && <ShippingTab collection={activeCol} onUpdate={onUpdateCollection} showMsg={showMsg}/>}
@@ -399,67 +412,110 @@
         const SettingsTab = ({ collection, adminConfig, onUpdateAdminConfig, onUpdate, showMsg }) => {
             const [lc, setLc] = useState({...collection});
             const [la, setLa] = useState({...adminConfig});
-            const handleSave = () => { onUpdate(lc); onUpdateAdminConfig(la); showMsg('Settings Saved'); };
+            const [saving, setSaving] = useState(false);
+
+            const handleSave = async () => {
+                setSaving(true);
+                onUpdate(lc);
+                onUpdateAdminConfig(la);
+                setTimeout(() => {
+                    setSaving(false);
+                    showMsg('Settings Saved Successfully');
+                }, 800);
+            };
+
+            const handleLogoUpload = async (e) => {
+                if(e.target.files[0]) {
+                    const base64 = await fileToBase64(e.target.files[0]);
+                    setLc({...lc, logoUrl: base64});
+                }
+            };
+
+            const handleLookbookUpload = async (e) => {
+                const files = Array.from(e.target.files);
+                const newImages = await Promise.all(files.map(async (f) => ({
+                    id: Math.random().toString(36).substr(2,9),
+                    url: await fileToBase64(f)
+                })));
+                setLc({...lc, lookbook: [...lc.lookbook, ...newImages]});
+            };
+
             return (
-                <div className="space-y-12 animate-fade-in">
-                    <section className="grid grid-cols-2 gap-10">
-                        <div className="space-y-4">
-                            <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-2">Security</h3>
+                <div className="space-y-16 animate-fade-in">
+                    <section className="grid grid-cols-1 md:grid-cols-2 gap-16">
+                        <div className="space-y-8">
+                            <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-4">Security & Access</h3>
                             <InputField label="Admin Password" value={la.password} onChange={v => setLa({...la, password: v})} />
                             <InputField label="Recovery Phrase" value={la.recoveryPhrase} onChange={v => setLa({...la, recoveryPhrase: v})} />
                         </div>
-                        <div className="space-y-4">
-                            <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-2">Branding</h3>
-                            <div className="flex items-center gap-4">
-                                {lc.logoUrl && <img src={lc.logoUrl} className="h-10 border p-1" />}
-                                <label className="flex-1 border border-dashed border-gray-200 p-4 text-center cursor-pointer hover:border-black transition-all">
-                                    <Upload size={16} className="mx-auto mb-1 text-gray-400"/>
-                                    <span className="text-[10px] uppercase tracking-widest">Logo Upload</span>
-                                    <input type="file" className="hidden" onChange={e => { if(e.target.files[0]) setLc({...lc, logoUrl: URL.createObjectURL(e.target.files[0])}); }} />
+                        <div className="space-y-8">
+                            <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-4">Brand Identity</h3>
+                            <div className="flex items-center gap-6">
+                                <div className="w-20 h-20 border bg-gray-50 flex items-center justify-center overflow-hidden">
+                                    {lc.logoUrl ? <img src={lc.logoUrl} className="w-full object-contain p-2" /> : <Package size={20} className="text-gray-300"/>}
+                                </div>
+                                <label className="flex-1 border border-dashed border-gray-200 p-6 text-center cursor-pointer hover:border-black transition-all">
+                                    <Upload size={16} className="mx-auto mb-2 text-gray-400"/>
+                                    <span className="text-[10px] uppercase tracking-widest font-bold">Upload Logo</span>
+                                    <input type="file" className="hidden" onChange={handleLogoUpload} />
                                 </label>
                             </div>
                         </div>
                     </section>
-                    <section className="space-y-4">
-                        <div className="flex justify-between items-center"><h3 className="text-xs font-bold uppercase tracking-widest">Influencer Codes</h3><button onClick={()=>setLc({...lc, accessCodes:[...lc.accessCodes, {code:'', limit:1}]})} className="text-[10px] underline uppercase tracking-widest">Add Code</button></div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+                    <section className="space-y-6">
+                        <div className="flex justify-between items-center"><h3 className="text-xs font-bold uppercase tracking-widest">Influencer Codes</h3><button onClick={()=>setLc({...lc, accessCodes:[...lc.accessCodes, {code:'', limit:1}]})} className="text-[10px] underline uppercase tracking-widest font-bold">Add New Code</button></div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {lc.accessCodes.map((ac, i) => (
-                                <div key={i} className="flex gap-2 items-center border-b py-2">
-                                    <input type="text" placeholder="CODE" value={ac.code} onChange={e=>{ const c=[...lc.accessCodes]; c[i].code=e.target.value.toUpperCase(); setLc({...lc, accessCodes:c}); }} className="flex-1 focus:outline-none uppercase text-xs tracking-widest"/>
-                                    <input type="number" value={ac.limit} onChange={e=>{ const c=[...lc.accessCodes]; c[i].limit=parseInt(e.target.value); setLc({...lc, accessCodes:c}); }} className="w-12 text-center text-xs border-x border-gray-100"/>
-                                    <button onClick={()=>setLc({...lc, accessCodes: lc.accessCodes.filter((_, idx)=>idx!==i)})}><X size={14} className="text-gray-300 hover:text-black"/></button>
+                                <div key={i} className="flex gap-4 items-center bg-gray-50 p-4 rounded-sm border border-gray-100 group">
+                                    <div className="flex-1"><InputField label="Code" value={ac.code} onChange={v => { const c=[...lc.accessCodes]; c[i].code=v.toUpperCase(); setLc({...lc, accessCodes:c}); }} /></div>
+                                    <div className="w-24"><InputField label="Qty Limit" type="number" value={ac.limit} onChange={v => { const c=[...lc.accessCodes]; c[i].limit=parseInt(v); setLc({...lc, accessCodes:c}); }} /></div>
+                                    <button onClick={()=>setLc({...lc, accessCodes: lc.accessCodes.filter((_, idx)=>idx!==i)})} className="mt-4 text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={16}/></button>
                                 </div>
                             ))}
                         </div>
                     </section>
+
+                    <section className="space-y-8">
+                        <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-4">Page Content</h3>
+                        <InputField label="Hero Title" value={lc.descriptionTitle} onChange={v => setLc({...lc, descriptionTitle: v})} />
+                        <div className="space-y-2">
+                            <label className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Hero Description</label>
+                            <textarea value={lc.descriptionBody} onChange={e => setLc({...lc, descriptionBody: e.target.value})} placeholder="Describe the season or collection..." className="w-full border p-4 text-xs font-light focus:outline-none focus:border-black h-32 leading-relaxed bg-gray-50 uppercase"/>
+                        </div>
+                    </section>
+
                     <section className="space-y-6">
-                        <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-2">Lookbook Gallery</h3>
+                        <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-4">Lookbook Gallery</h3>
                         <div className="flex flex-wrap gap-4">
                             {lc.lookbook.map(lb => (
-                                <div key={lb.id} className="relative w-24 aspect-lookbook border group overflow-hidden bg-gray-50">
+                                <div key={lb.id} className="relative w-24 aspect-lookbook border group overflow-hidden bg-gray-50 shadow-sm">
                                     <img src={lb.url} className="w-full h-full object-cover"/>
-                                    <button onClick={()=>setLc({...lc, lookbook: lc.lookbook.filter(i=>i.id!==lb.id)})} className="absolute top-1 right-1 p-1 bg-white/80 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"><X size={10}/></button>
+                                    <button onClick={()=>setLc({...lc, lookbook: lc.lookbook.filter(i=>i.id!==lb.id)})} className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"><X size={14}/></button>
                                 </div>
                             ))}
-                            <label className="w-24 aspect-lookbook border border-dashed border-gray-200 flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-black cursor-pointer transition-colors">
-                                <Plus size={24}/><span className="text-[10px] uppercase tracking-widest">Upload</span>
-                                <input type="file" multiple className="hidden" onChange={e => { const fs=Array.from(e.target.files).map(f=>({id:Math.random().toString(36).substr(2,9), url:URL.createObjectURL(f)})); setLc({...lc, lookbook: [...lc.lookbook, ...fs]}); }} />
+                            <label className="w-24 aspect-lookbook border border-dashed border-gray-200 flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-black cursor-pointer hover:bg-gray-50 transition-all">
+                                <Plus size={24}/><span className="text-[10px] uppercase tracking-widest font-bold">Add</span>
+                                <input type="file" multiple className="hidden" onChange={handleLookbookUpload} />
                             </label>
                         </div>
                     </section>
-                    <section className="space-y-4">
-                        <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-2">Intro Description</h3>
-                        <InputField label="Title" value={lc.descriptionTitle} onChange={v => setLc({...lc, descriptionTitle: v})} />
-                        <textarea value={lc.descriptionBody} onChange={e => setLc({...lc, descriptionBody: e.target.value})} placeholder="Body..." className="w-full border p-4 text-xs font-light focus:outline-none focus:border-black h-32 leading-relaxed"/>
-                    </section>
-                    <div className="flex justify-end pt-10"><button onClick={handleSave} className="bg-black text-white px-10 py-4 text-xs uppercase tracking-[0.2em] transition-colors hover:bg-zinc-800 flex items-center gap-2"><Save size={16}/> Save Settings</button></div>
+
+                    <div className="flex justify-end pt-10 sticky bottom-0 bg-white/90 backdrop-blur-sm py-6 border-t">
+                        <button onClick={handleSave} className={`${saving ? 'bg-green-600' : 'bg-black'} text-white px-12 py-4 text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 hover:bg-zinc-800`}>
+                            {saving ? <RefreshCcw size={16} className="animate-spin" /> : <Save size={16}/>}
+                            {saving ? 'Saving...' : 'Save All Settings'}
+                        </button>
+                    </div>
                 </div>
             );
         };
 
         const ProductsTab = ({ collection, onUpdate, showMsg }) => {
             const [prods, setProds] = useState([...collection.products]);
-            const handleUpload = (e) => {
+            const [saving, setSaving] = useState(false);
+
+            const handleBulkUpload = (e) => {
                 const f = e.target.files[0]; if(!f) return;
                 const r = new FileReader();
                 r.onload = (event) => {
@@ -467,37 +523,71 @@
                     const news = rows.map(r => {
                         const parts = r.split(/[\t,]/);
                         const name = parts[0]?.trim(); if(!name || name==='상품') return null;
-                        const opts = parts[2]?.match(/size\{(.*)\}/)?.[1]?.split('|') || [];
+                        const opts = parts[2]?.match(/size\{(.*)\}/)?.[1]?.split('|') || ['FREE'];
                         return { id: Math.random().toString(36).substr(2,9), name, price: parseInt(parts[1])||0, options: opts, summary: parts[3]||'', images: [] };
                     }).filter(Boolean);
-                    setProds([...prods, ...news]); showMsg(`${news.length} items added`);
+                    setProds([...prods, ...news]);
+                    showMsg(`${news.length} items imported`);
                 };
                 r.readAsText(f);
             };
+
+            const handleProductImg = async (e, idx) => {
+                const files = Array.from(e.target.files);
+                const base64s = await Promise.all(files.map(f => fileToBase64(f)));
+                const n = [...prods];
+                n[idx].images = [...n[idx].images, ...base64s];
+                setProds(n);
+            };
+
+            const handleSave = () => {
+                setSaving(true);
+                onUpdate({...collection, products: prods});
+                setTimeout(() => {
+                    setSaving(false);
+                    showMsg('Product Catalog Saved');
+                }, 800);
+            };
+
             return (
                 <div className="space-y-12 animate-fade-in">
-                    <section className="flex justify-between items-center border-b pb-6">
-                        <div><h3 className="text-xs font-bold uppercase tracking-widest">Bulk Import</h3><p className="text-[9px] text-gray-400 uppercase tracking-widest">Header: 상품, 판매가, 옵션(size{1|2}), 설명</p></div>
-                        <label className="bg-black text-white px-6 py-3 text-[10px] uppercase cursor-pointer flex items-center gap-2 tracking-widest"><FileText size={14}/> Upload File<input type="file" className="hidden" onChange={handleUpload}/></label>
+                    <section className="flex justify-between items-center border-b pb-8">
+                        <div><h3 className="text-xs font-bold uppercase tracking-widest">Bulk Product Import</h3><p className="text-[9px] text-gray-400 uppercase tracking-widest mt-1">TSV/CSV Format: 상품, 가격, 옵션(size{S|M}), 요약</p></div>
+                        <label className="bg-gray-50 border border-gray-200 px-6 py-3 text-[10px] uppercase cursor-pointer flex items-center gap-2 tracking-widest font-bold hover:bg-black hover:text-white transition-all"><FileText size={14}/> Import File<input type="file" className="hidden" onChange={handleBulkUpload}/></label>
                     </section>
-                    <div className="space-y-4">
+                    
+                    <div className="grid grid-cols-1 gap-4">
                         {prods.map((p, i) => (
-                            <div key={p.id} className="flex gap-6 items-start p-6 bg-gray-50 border border-gray-100 group relative">
-                                <span className="text-[10px] text-gray-300 font-mono">{i+1}</span>
-                                <div className="flex-1 grid grid-cols-4 gap-6">
-                                    <div className="space-y-1"><p className="text-[9px] font-bold text-gray-400 uppercase">Product</p><p className="text-xs font-medium uppercase tracking-widest">{p.name}</p></div>
-                                    <div className="space-y-1 text-center"><p className="text-[9px] font-bold text-gray-400 uppercase">Price</p><p className="text-xs">₩{p.price.toLocaleString()}</p></div>
-                                    <div className="col-span-2 space-y-1"><p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Description</p><textarea value={p.summary} onChange={e=>{ const n=[...prods]; n[i].summary=e.target.value; setProds(n); }} className="w-full bg-white border border-gray-100 p-2 text-xs focus:outline-none h-16 resize-none no-scrollbar"/></div>
+                            <div key={p.id} className="flex gap-6 items-start p-6 bg-gray-50 border border-gray-100 group relative rounded-sm shadow-sm">
+                                <div className="flex-1 grid grid-cols-4 gap-8">
+                                    <div className="col-span-1"><InputField label="Product Name" value={p.name} onChange={v => { const n=[...prods]; n[i].name=v; setProds(n); }} /></div>
+                                    <div className="col-span-3 space-y-2">
+                                        <label className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Description / Summary</label>
+                                        <textarea value={p.summary} onChange={e=>{ const n=[...prods]; n[i].summary=e.target.value; setProds(n); }} className="w-full bg-white border border-gray-100 p-3 text-xs focus:outline-none h-16 resize-none uppercase leading-relaxed font-light"/>
+                                    </div>
                                 </div>
-                                <div className="w-48 flex gap-2 flex-wrap justify-end">
-                                    {p.images.map((img, idx) => <div key={idx} className="relative w-12 aspect-product border border-gray-200 bg-white"><img src={img} className="w-full h-full object-cover"/><button onClick={()=>{const n=[...prods]; n[i].images=n[i].images.filter((_,j)=>j!==idx); setProds(n);}} className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 hover:opacity-100"><X size={10}/></button></div>)}
-                                    <label className="w-12 aspect-product border border-dashed border-gray-300 flex items-center justify-center text-gray-400 cursor-pointer bg-white transition-colors"><Plus size={14}/><input type="file" multiple className="hidden" onChange={e=>{ const fs=Array.from(e.target.files).map(f=>URL.createObjectURL(f)); const n=[...prods]; n[i].images=[...n[i].images, ...fs]; setProds(n); }}/></label>
+                                <div className="w-64 flex gap-2 flex-wrap justify-end">
+                                    {p.images.map((img, imgIdx) => (
+                                        <div key={imgIdx} className="relative w-12 aspect-product border border-gray-200 bg-white shadow-sm group/img">
+                                            <img src={img} className="w-full h-full object-cover"/>
+                                            <button onClick={()=>{const n=[...prods]; n[i].images=n[i].images.filter((_,j)=>j!==imgIdx); setProds(n);}} className="absolute inset-0 bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity"><Trash2 size={10}/></button>
+                                        </div>
+                                    ))}
+                                    <label className="w-12 aspect-product border border-dashed border-gray-300 flex items-center justify-center text-gray-400 cursor-pointer bg-white hover:border-black hover:text-black transition-colors">
+                                        <Plus size={14}/><input type="file" multiple className="hidden" onChange={e => handleProductImg(e, i)}/>
+                                    </label>
                                 </div>
-                                <button onClick={()=>setProds(prods.filter(it=>it.id!==p.id))} className="absolute top-2 right-2 text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
+                                <button onClick={()=>setProds(prods.filter(it=>it.id!==p.id))} className="absolute top-2 right-2 text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><X size={16}/></button>
                             </div>
                         ))}
                     </div>
-                    <div className="flex justify-end pt-10"><button onClick={()=>onUpdate({...collection, products: prods})} className="bg-black text-white px-10 py-4 text-xs uppercase flex items-center gap-2 transition-colors hover:bg-zinc-800"><Save size={16}/> Save Catalog</button></div>
+
+                    <div className="flex justify-end pt-10 sticky bottom-0 bg-white/90 backdrop-blur-sm py-6 border-t">
+                        <button onClick={handleSave} className={`${saving ? 'bg-green-600' : 'bg-black'} text-white px-12 py-4 text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 hover:bg-zinc-800`}>
+                            {saving ? <RefreshCcw size={16} className="animate-spin" /> : <Save size={16}/>}
+                            {saving ? 'Saving Catalog...' : 'Save Product Catalog'}
+                        </button>
+                    </div>
                 </div>
             );
         };
@@ -506,6 +596,7 @@
             const [orders, setOrders] = useState([...collection.orders]);
             const [sel, setSel] = useState(new Set());
             const [sort, setSort] = useState({ key: 'date', dir: 'desc' });
+            const [saving, setSaving] = useState(false);
 
             const sorted = useMemo(() => {
                 return [...orders].sort((a,b) => {
@@ -525,65 +616,103 @@
                 setSel(next);
             };
 
+            const handleSave = () => {
+                setSaving(true);
+                onUpdate({...collection, orders});
+                setTimeout(() => {
+                    setSaving(false);
+                    showMsg('Order Database Updated');
+                }, 800);
+            };
+
+            const exportCSV = () => {
+                const csv = "Instagram,Name,Phone,Address,Product,Size,Date,Status,Memo\n" + 
+                    orders.map(o => `${o.instagramId},${o.name},${o.phone},"${o.address}",${o.productName},${o.size},${o.date},${o.status},"${o.adminMemo||''}"`).join('\n');
+                const b = new Blob(["\ufeff"+csv], {type:'text/csv'});
+                const u = URL.createObjectURL(b);
+                const l = document.createElement('a');
+                l.href = u;
+                l.download = `shipping_${collection.name}_${new Date().toLocaleDateString()}.csv`;
+                l.click();
+            };
+
             return (
                 <div className="space-y-8 animate-fade-in">
-                    <div className="flex justify-between items-center">
+                    <div className="flex justify-between items-center gap-4 flex-wrap">
                         <div className="flex gap-2">
-                            <select onChange={e=>{ const n=orders.map(o=>sel.has(o.id)?{...o, status:e.target.value, shippedDate:e.target.value==='Shipped'?new Date().toLocaleDateString():undefined}:o); setOrders(n); setSel(new Set()); showMsg('Status Updated'); }} className="text-[10px] uppercase border p-2 focus:outline-none tracking-widest" value="">
-                                <option value="" disabled>Status Action</option><option value="Preparing">Preparing</option><option value="Shipped">Shipped</option>
+                            <select onChange={e=>{ const n=orders.map(o=>sel.has(o.id)?{...o, status:e.target.value, shippedDate:e.target.value==='Shipped'?new Date().toLocaleDateString():undefined}:o); setOrders(n); setSel(new Set()); showMsg('Batch Status Updated'); }} className="text-[10px] uppercase border p-3 focus:outline-none tracking-widest font-bold bg-gray-50" value="">
+                                <option value="" disabled>Status Action</option>
+                                <option value="Preparing">Set Preparing</option>
+                                <option value="Shipped">Set Shipped</option>
                             </select>
-                            <button onClick={()=>{ const csv="Instagram,Name,Phone,Address,Product,Size,Date\n"+orders.map(o=>`${o.instagramId},${o.name},${o.phone},"${o.address}",${o.productName},${o.size},${o.date}`).join('\n'); const b=new Blob(["\ufeff"+csv],{type:'text/csv'}); const u=URL.createObjectURL(b); const l=document.createElement('a'); l.href=u; l.download='shipping.csv'; l.click(); }} className="flex items-center gap-2 border px-4 py-2 text-[10px] uppercase hover:bg-black hover:text-white transition-all tracking-widest"><Download size={14}/> Export CSV</button>
+                            <button onClick={exportCSV} className="flex items-center gap-2 border px-6 py-3 text-[10px] uppercase hover:bg-black hover:text-white transition-all tracking-widest font-bold font-bold"><Download size={14}/> CSV Export</button>
                         </div>
-                        <button onClick={()=>onUpdate({...collection, orders})} className="bg-black text-white px-8 py-3 text-[10px] uppercase flex items-center gap-2 transition-colors hover:bg-zinc-800 tracking-widest"><Save size={14}/> Save Database</button>
+                        <button onClick={handleSave} className={`${saving ? 'bg-green-600' : 'bg-black'} text-white px-10 py-3 text-[10px] uppercase flex items-center gap-2 transition-all hover:bg-zinc-800 tracking-widest font-bold`}>
+                            {saving ? <RefreshCcw size={14} className="animate-spin" /> : <Save size={14}/>}
+                            {saving ? 'Saving...' : 'Save Database'}
+                        </button>
                     </div>
-                    <div className="overflow-x-auto border rounded-sm shadow-sm bg-white">
+
+                    <div className="overflow-x-auto border border-gray-100 rounded-sm shadow-sm bg-white">
                         <table className="w-full text-[10px] uppercase tracking-wider text-left border-collapse table-fixed min-w-[1200px]">
                             <thead>
                                 <tr className="bg-gray-50 border-b border-gray-100">
-                                    <th className="p-3 w-10 text-center"><input type="checkbox" onChange={e=>setSel(e.target.checked?new Set(orders.map(o=>o.id)):new Set())}/></th>
+                                    <th className="p-4 w-12 text-center"><input type="checkbox" onChange={e=>setSel(e.target.checked?new Set(orders.map(o=>o.id)):new Set())}/></th>
                                     {['Status','Date','Instagram','Name'].map(l=>(
-                                        <th key={l} onClick={()=>setSort({key:l.toLowerCase().replace(' ','Id'), dir:sort.dir==='asc'?'desc':'asc'})} className="p-3 font-bold text-gray-400 cursor-pointer hover:text-black transition-colors">
+                                        <th key={l} onClick={()=>setSort({key:l.toLowerCase().replace(' ','Id'), dir:sort.dir==='asc'?'desc':'asc'})} className="p-4 font-bold text-gray-400 cursor-pointer hover:text-black transition-colors">
                                             <div className="flex items-center gap-1">{l}<ArrowUpDown size={10}/></div>
                                         </th>
                                     ))}
-                                    <th className="p-3 text-gray-400 w-[60px]">Contact</th>
-                                    <th className="p-3 text-gray-400 w-[100px]">Address</th>
-                                    <th className="p-3 text-gray-400 w-[120px]">Item</th>
-                                    <th className="p-3 text-gray-400 w-[50px] text-center">Size</th>
-                                    <th className="p-3 text-gray-400 w-[300px]">Admin Memo</th>
-                                    <th className="p-3 w-32"></th>
+                                    <th className="p-4 text-gray-400 w-32">Contact</th>
+                                    <th className="p-4 text-gray-400">Address</th>
+                                    <th className="p-4 text-gray-400">Product Info</th>
+                                    <th className="p-4 text-gray-400">Memo</th>
+                                    <th className="p-4 w-24">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {sorted.map(o=>(
-                                    <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50 group">
-                                        <td className="p-3 text-center"><input type="checkbox" checked={sel.has(o.id)} onChange={()=>toggleSel(o.id)}/></td>
-                                        <td className="p-3"><select value={o.status} onChange={e=>updateOrder(o.id,'status',e.target.value)} className={`bg-transparent font-bold focus:outline-none ${o.status==='Shipped'?'text-green-600':'text-orange-400'}`}><option value="Preparing">Preparing</option><option value="Shipped">Shipped</option></select></td>
-                                        <td className="p-3 text-gray-400">{o.status==='Shipped'?o.shippedDate:o.date}</td>
-                                        <td className="p-3 font-medium">{o.instagramId}</td>
-                                        <td className="p-3">{o.name}</td>
-                                        <td className="p-3 text-gray-400 truncate" title={o.phone}>{o.phone?.slice(0,3)}...</td>
-                                        <td className="p-3 text-gray-400 truncate" title={o.address}>{o.address?.slice(0,10)}...</td>
-                                        <td className="p-3"><input type="text" value={o.productName || ''} onChange={e=>updateOrder(o.id,'productName',e.target.value)} className="w-full bg-transparent focus:bg-gray-50 border-b border-transparent focus:border-gray-100 p-1"/></td>
-                                        <td className="p-3"><input type="text" value={o.size || ''} onChange={e=>updateOrder(o.id,'size',e.target.value)} className="w-full bg-transparent text-center focus:bg-gray-50 border-b border-transparent focus:border-gray-100 p-1"/></td>
-                                        <td className="p-3"><textarea value={o.adminMemo||''} onChange={e=>updateOrder(o.id,'adminMemo',e.target.value)} placeholder="..." className="w-full h-8 bg-transparent focus:bg-gray-50 border border-transparent focus:border-gray-100 resize-none no-scrollbar p-1 rounded-sm"/></td>
-                                        <td className="p-3 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button onClick={()=>{ const copy={...o,id:Math.random().toString(36).substr(2,9),date:'추가 제품',productName:'',size:''}; setOrders([copy,...orders]); showMsg('Copied'); }} className="text-gray-400 hover:text-black transition-colors"><Copy size={14}/></button>
-                                            <button onClick={()=>setOrders(orders.filter(it=>it.id!==o.id))} className="text-gray-200 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
+                                    <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50 group transition-colors">
+                                        <td className="p-4 text-center"><input type="checkbox" checked={sel.has(o.id)} onChange={()=>toggleSel(o.id)}/></td>
+                                        <td className="p-4">
+                                            <select value={o.status} onChange={e=>updateOrder(o.id,'status',e.target.value)} className={`bg-transparent font-bold focus:outline-none ${o.status==='Shipped'?'text-green-600':'text-orange-400'}`}>
+                                                <option value="Preparing">Preparing</option>
+                                                <option value="Shipped">Shipped</option>
+                                            </select>
+                                        </td>
+                                        <td className="p-4 text-gray-400 font-mono">{o.status==='Shipped'?o.shippedDate:o.date}</td>
+                                        <td className="p-4 font-bold">{o.instagramId}</td>
+                                        <td className="p-4 font-medium">{o.name}</td>
+                                        <td className="p-4 text-gray-400 truncate" title={o.phone}>{o.phone}</td>
+                                        <td className="p-4 text-gray-400 truncate" title={o.address}>{o.address}</td>
+                                        <td className="p-4">
+                                            <div className="flex flex-col gap-1">
+                                                <span className="font-bold">{o.productName}</span>
+                                                <span className="text-gray-400 text-[9px]">{o.size}</span>
+                                            </div>
+                                        </td>
+                                        <td className="p-4"><textarea value={o.adminMemo||''} onChange={e=>updateOrder(o.id,'adminMemo',e.target.value)} placeholder="..." className="w-full h-8 bg-transparent focus:bg-white border border-transparent focus:border-gray-200 resize-none no-scrollbar p-1 rounded-sm text-[9px]"/></td>
+                                        <td className="p-4">
+                                            <div className="flex items-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button onClick={()=>{ const copy={...o,id:Math.random().toString(36).substr(2,9),date:new Date().toLocaleDateString(),status:'Preparing'}; setOrders([copy,...orders]); showMsg('Order Duplicated'); }} className="text-gray-400 hover:text-black transition-colors"><Copy size={14}/></button>
+                                                <button onClick={()=>setOrders(orders.filter(it=>it.id!==o.id))} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
+                        {orders.length === 0 && <div className="p-20 text-center text-[10px] text-gray-300 uppercase tracking-[0.3em]">No orders yet</div>}
                     </div>
                 </div>
             );
         };
 
         const ReportTab = ({ collection }) => {
-            const COLORS = ['#6366f1', '#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6'];
+            const COLORS = ['#000000', '#4a4a4a', '#8e8e8e', '#cccccc', '#e5e5e5'];
             const stats = useMemo(() => {
-                const p = {}; collection.orders.forEach(o=>{ p[o.productName]=(p[o.productName]||0)+1; });
+                const p = {}; 
+                collection.orders.forEach(o=>{ p[o.productName]=(p[o.productName]||0)+1; });
                 return Object.entries(p).map(([name, value])=>({ 
                     name: name || 'N/A', 
                     value, 
@@ -592,61 +721,86 @@
             }, [collection]);
 
             return (
-                <div className="space-y-16 animate-fade-in py-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="space-y-16 animate-fade-in py-10">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-20">
                         <div className="space-y-8">
-                            <h3 className="text-[10px] font-bold uppercase tracking-widest border-b border-gray-100 pb-2">Seeding Reach</h3>
-                            <div className="h-[340px]">
+                            <h3 className="text-[10px] font-bold uppercase tracking-widest border-b pb-4">Product Distribution Ranking</h3>
+                            <div className="h-[400px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={stats}>
+                                    <BarChart data={stats} margin={{top: 0, right: 0, left: -20, bottom: 0}}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                                        <XAxis dataKey="name" tick={{fontSize:8, fill:'#94a3b8'}} axisLine={false} tickLine={false}/>
-                                        <YAxis tick={{fontSize:8, fill:'#94a3b8'}} axisLine={false} tickLine={false}/>
-                                        <Tooltip cursor={{fill:'#f8fafc'}} contentStyle={{fontSize: '10px', textTransform: 'uppercase'}}/>
-                                        <Bar dataKey="value" radius={[2, 2, 0, 0]}>
+                                        <XAxis dataKey="name" tick={{fontSize:9, fill:'#94a3b8'}} axisLine={false} tickLine={false} interval={0} angle={-15} textAnchor="end"/>
+                                        <YAxis tick={{fontSize:9, fill:'#94a3b8'}} axisLine={false} tickLine={false}/>
+                                        <Tooltip cursor={{fill:'#f8fafc'}} contentStyle={{fontSize: '10px', textTransform: 'uppercase', borderRadius: '0', border: '1px solid #000'}}/>
+                                        <Bar dataKey="value" barSize={40}>
                                             {stats.map((_, i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}
                                         </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>
                         </div>
-                        <div className="flex flex-col justify-center items-center text-center space-y-10">
-                            <div className="p-12 border-[10px] border-black inline-block rounded-sm animate-fade-in"><p className="text-[10px] uppercase tracking-[0.4em] text-gray-400 mb-4 font-bold">Total Distributions</p><p className="text-8xl font-light italic">{collection.orders.length}</p></div>
-                            <div className="space-y-4 w-full max-w-xs">{stats.slice(0, 5).map((s,i)=><div key={i} className="flex justify-between text-[10px] uppercase tracking-widest font-bold"><span className="text-gray-400">{s.name}</span><span>{s.pct}%</span></div>)}</div>
+                        <div className="flex flex-col justify-center items-center text-center space-y-12">
+                            <div className="p-16 border-[12px] border-black inline-block rounded-sm animate-fade-in shadow-2xl">
+                                <p className="text-[11px] uppercase tracking-[0.5em] text-gray-400 mb-6 font-bold">Total Items Distributed</p>
+                                <p className="text-9xl font-light italic">{collection.orders.length}</p>
+                            </div>
+                            <div className="space-y-4 w-full max-w-xs">
+                                <h4 className="text-[9px] uppercase tracking-widest font-bold text-gray-400 text-left border-b pb-2 mb-4">Top Selections</h4>
+                                {stats.slice(0, 5).map((s,i)=>(
+                                    <div key={i} className="flex justify-between text-[10px] uppercase tracking-widest font-bold items-center">
+                                        <span className="text-gray-400 truncate w-40 text-left">{s.name}</span>
+                                        <span className="bg-black text-white px-2 py-0.5">{s.pct}%</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>
             );
         };
 
-        // --- Main App ---
+        // --- Main App Component ---
         const App = () => {
             const [collections, setCollections] = useState(() => {
-                const saved = localStorage.getItem('nuuanu_collections_v3');
+                const saved = localStorage.getItem('nuuanu_collections_v3_final');
                 return saved ? JSON.parse(saved) : INITIAL_COLLECTIONS;
             });
+
             const [adminConfig, setAdminConfig] = useState(() => {
-                const saved = localStorage.getItem('nuuanu_admin_v3');
+                const saved = localStorage.getItem('nuuanu_admin_v3_final');
                 return saved ? JSON.parse(saved) : { password: 'ADMIN', recoveryPhrase: 'nuuanu' };
             });
+
             const [session, setSession] = useState(null);
 
-            useEffect(() => { localStorage.setItem('nuuanu_collections_v3', JSON.stringify(collections)); }, [collections]);
-            useEffect(() => { localStorage.setItem('nuuanu_admin_v3', JSON.stringify(adminConfig)); }, [adminConfig]);
+            useEffect(() => { 
+                localStorage.setItem('nuuanu_collections_v3_final', JSON.stringify(collections)); 
+            }, [collections]);
+
+            useEffect(() => { 
+                localStorage.setItem('nuuanu_admin_v3_final', JSON.stringify(adminConfig)); 
+            }, [adminConfig]);
 
             const handleLogin = (code) => {
                 const input = code.trim().toUpperCase();
-                if (input === adminConfig.password.toUpperCase()) { setSession({ role: 'admin' }); return true; }
+                if (input === adminConfig.password.toUpperCase()) { 
+                    setSession({ role: 'admin' }); 
+                    return true; 
+                }
                 for (const col of collections) {
                     const match = col.accessCodes.find(c => c.code.toUpperCase() === input);
-                    if (match) { setSession({ role: 'influencer', collectionId: col.id, limit: match.limit }); return true; }
+                    if (match) { 
+                        setSession({ role: 'influencer', collectionId: col.id, limit: match.limit }); 
+                        return true; 
+                    }
                 }
                 return false;
             };
 
             const handleReset = (phrase) => {
                 if (phrase.trim().toLowerCase() === adminConfig.recoveryPhrase.toLowerCase()) {
-                    setAdminConfig(prev => ({ ...prev, password: 'ADMIN' })); return true;
+                    setAdminConfig(prev => ({ ...prev, password: 'ADMIN' })); 
+                    return true;
                 }
                 return false;
             };
@@ -660,12 +814,13 @@
                     onUpdateAdminConfig={setAdminConfig}
                     onUpdateCollection={updated => setCollections(collections.map(c => c.id === updated.id ? updated : c))}
                     onAddCollection={newCol => setCollections([...collections, newCol])}
+                    onDeleteCollection={id => setCollections(collections.filter(c => c.id !== id))}
                     onLogout={() => setSession(null)}
                 />
             );
 
             const activeCol = collections.find(c => c.id === session.collectionId);
-            if (!activeCol) return null;
+            if (!activeCol) return <div className="p-20 text-center">Collection not found.</div>;
 
             return (
                 <InfluencerPage 
