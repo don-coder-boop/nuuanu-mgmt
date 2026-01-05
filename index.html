@@ -3,326 +3,184 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>nuuanu - Influencer Seeding Portal (Storage Monitor)</title>
+    <title>nuuanu - Influencer Seeding Portal</title>
     <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide-react"></script>
-    <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://unpkg.com/lucide-react@latest"></script>
+    
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;700&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #ffffff; color: #000; overflow-x: hidden; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
         .aspect-lookbook { aspect-ratio: 2 / 3; }
         .aspect-product { aspect-ratio: 3 / 4; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.6s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .save-success { background-color: #10b981 !important; }
-        .storage-warning { background-color: #ef4444 !important; color: white !important; }
     </style>
 </head>
 <body>
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect, useMemo, useRef } = React;
+        const { useState, useEffect, useMemo } = React;
         const { createRoot } = ReactDOM;
+
+        // 에러 해결을 위한 아이콘 정의 방식 변경
         const { 
-            X, Plus, ShoppingBag, ChevronDown, Check, AlertTriangle,
-            Save, Trash2, LogOut, Package, Truck, BarChart3, 
-            Settings, Upload, RefreshCcw
-        } = lucide;
-        const { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } = Recharts;
+            X, Plus, ShoppingBag, ChevronDown, Check, Save, Trash2, 
+            LogOut, Package, Truck, BarChart3, Settings, Upload
+        } = lucideReact;
 
         // --- Utils ---
         const compressImage = (file) => {
             return new Promise((resolve) => {
                 const reader = new FileReader();
                 reader.readAsDataURL(file);
-                reader.onload = (event) => {
+                reader.onload = (e) => {
                     const img = new Image();
-                    img.src = event.target.result;
+                    img.src = e.target.result;
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
-                        const MAX_WIDTH = 1000; 
+                        const MAX_WIDTH = 1000;
                         let width = img.width;
                         let height = img.height;
                         if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
                         canvas.width = width; canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.6)); // 압축률을 0.6으로 조금 더 강화
+                        resolve(canvas.toDataURL('image/jpeg', 0.6));
                     };
                 };
             });
         };
 
-        // --- Storage Monitor Component ---
         const StorageMonitor = () => {
             const [usage, setUsage] = useState(0);
-            const limit = 5 * 1024 * 1024; // 5MB 기준
-
+            const limit = 5 * 1024 * 1024;
             useEffect(() => {
-                const checkUsage = () => {
-                    const used = encodeURI(JSON.stringify(localStorage)).split(/%..|./).length - 1;
-                    setUsage(used);
-                };
-                checkUsage();
-                window.addEventListener('storage', checkUsage);
-                return () => window.removeEventListener('storage', checkUsage);
+                const used = encodeURI(JSON.stringify(localStorage)).split(/%..|./).length - 1;
+                setUsage(used);
             }, []);
-
             const percent = Math.min((usage / limit) * 100, 100);
-            const isDanger = percent > 80;
-
             return (
                 <div className="fixed bottom-4 right-4 bg-white border p-3 rounded-lg shadow-lg z-[100] w-48 space-y-2">
                     <div className="flex justify-between text-[9px] font-bold uppercase tracking-widest">
-                        <span>Storage Usage</span>
-                        <span className={isDanger ? 'text-red-500' : 'text-gray-400'}>{Math.round(percent)}%</span>
+                        <span>Storage</span>
+                        <span className={percent > 80 ? 'text-red-500' : 'text-gray-400'}>{Math.round(percent)}%</span>
                     </div>
                     <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-                        <div className={`h-full transition-all duration-500 ${isDanger ? 'bg-red-500' : 'bg-black'}`} style={{ width: `${percent}%` }}></div>
+                        <div className={`h-full transition-all ${percent > 80 ? 'bg-red-500' : 'bg-black'}`} style={{ width: `${percent}%` }}></div>
                     </div>
-                    {isDanger && (
-                        <p className="text-[8px] text-red-500 leading-tight animate-pulse font-bold">
-                            WARNING: CAPACITY NEARLY FULL. DELETE OLD COLLECTIONS.
-                        </p>
-                    )}
                 </div>
             );
         };
 
-        const INITIAL_COLLECTIONS = [{
-            id: '25fw-seeding',
-            name: '25FW COLLECTION',
-            accessCodes: [{ code: 'NUUANU25', limit: 3 }],
-            lookbook: [], products: [], orders: [],
-            descriptionTitle: 'Welcome, nuuanu girls',
-            descriptionBody: '25FW 시즌 시딩을 위한 셀렉션 페이지입니다.',
-            logoUrl: ''
-        }];
-
-        // --- Shared UI ---
-        const InputField = ({ label, value, onChange, type = "text", required = false }) => (
+        const InputField = ({ label, value, onChange, type = "text" }) => (
             <div className="space-y-1.5 w-full">
-                <label className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">{label} {required && "*"}</label>
+                <label className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">{label}</label>
                 <input type={type} value={value} onChange={e => onChange(e.target.value)} className="w-full border-b border-gray-200 py-2 focus:outline-none focus:border-black transition-colors bg-transparent text-sm uppercase" />
             </div>
         );
 
-        // --- LoginPage ---
-        const LoginPage = ({ onLogin, onReset }) => {
-            const [code, setCode] = useState('');
-            const [error, setError] = useState(false);
+        // --- Admin Components ---
+        const SettingsTab = ({ collection, onUpdate, showMsg }) => {
+            const [lc, setLc] = useState({...collection});
+            const [saving, setSaving] = useState(false);
+            const handleSave = async () => { setSaving(true); await onUpdate(lc); setSaving(false); showMsg("Saved"); };
+
             return (
-                <div className="min-h-screen flex items-center justify-center bg-white px-6">
-                    <div className="w-full max-w-sm space-y-12 text-center animate-fade-in">
-                        <div className="space-y-4">
-                            <h1 className="text-3xl font-light italic tracking-[0.3em] uppercase">nuuanu</h1>
-                            <p className="text-[10px] tracking-[0.4em] text-gray-400 uppercase">Seeding Portal</p>
-                        </div>
-                        <form onSubmit={(e) => { e.preventDefault(); if(!onLogin(code)) { setError(true); setTimeout(()=>setError(false), 2000); } }} className="space-y-8">
-                            <input type="text" placeholder="ENTER ACCESS CODE" value={code} onChange={e => setCode(e.target.value.toUpperCase())} className={`w-full text-center border-b py-4 focus:outline-none tracking-[0.5em] text-sm transition-all ${error ? 'border-red-500' : 'border-gray-200 focus:border-black'}`} />
-                            <button className="w-full bg-black text-white py-4 text-[10px] tracking-[0.3em] uppercase hover:bg-zinc-800 transition-colors">Enter</button>
-                        </form>
+                <div className="space-y-12 animate-fade-in">
+                    <div className="grid grid-cols-2 gap-12">
+                        <InputField label="Collection Name" value={lc.name} onChange={v => setLc({...lc, name:v})} />
+                        <InputField label="Welcome Title" value={lc.descriptionTitle} onChange={v => setLc({...lc, descriptionTitle:v})} />
                     </div>
+                    <div className="space-y-6">
+                        <h3 className="text-xs font-bold uppercase tracking-widest">Lookbook (Drag & Drop)</h3>
+                        <div onDragOver={e=>e.preventDefault()} onDrop={async e=>{e.preventDefault(); const urls=await Promise.all(Array.from(e.dataTransfer.files).map(compressImage)); setLc({...lc, lookbook:[...lc.lookbook, ...urls.map(u=>({id:Math.random(),url:u}))]});}} className="flex flex-wrap gap-2 min-h-[100px] border border-dashed p-4 border-gray-200">
+                            {lc.lookbook.map(lb=>(<div key={lb.id} className="relative w-20 aspect-lookbook group"><img src={lb.url} className="w-full h-full object-cover"/><button onClick={()=>setLc({...lc, lookbook:lc.lookbook.filter(i=>i.id!==lb.id)})} className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center"><X size={14}/></button></div>))}
+                        </div>
+                    </div>
+                    <button onClick={handleSave} className={`w-full py-4 text-xs tracking-widest uppercase transition-all ${saving ? 'save-success text-white' : 'bg-black text-white'}`}>{saving ? 'SAVED' : 'SAVE CHANGES'}</button>
                 </div>
             );
         };
 
-        // --- Admin Dashboard (With Save Error Handling) ---
-        const AdminDashboard = ({ collections, adminConfig, onUpdateAdminConfig, onUpdateCollection, onAddCollection, onDeleteCollection, onLogout }) => {
+        const ProductsTab = ({ collection, onUpdate, showMsg }) => {
+            const [prods, setProds] = useState([...collection.products]);
+            const [saving, setSaving] = useState(false);
+            const handleSave = async () => { setSaving(true); await onUpdate({...collection, products:prods}); setSaving(false); showMsg("Saved"); };
+
+            return (
+                <div className="space-y-8 animate-fade-in">
+                    <button onClick={()=>setProds([...prods, {id:Math.random().toString(36).substr(2,9), name:'New Item', options:['S','M','L'], summary:'', images:[]}])} className="text-[10px] border border-black px-4 py-2 uppercase font-bold">+ Add Product</button>
+                    {prods.map((p, i)=>(
+                        <div key={p.id} className="p-6 bg-gray-50 border border-gray-100 flex gap-6 relative">
+                            <div className="flex-1"><InputField label="Product Name" value={p.name} onChange={v=>{const n=[...prods]; n[i].name=v; setProds(n);}} /></div>
+                            <div onDragOver={e=>e.preventDefault()} onDrop={async e=>{e.preventDefault(); const urls=await Promise.all(Array.from(e.dataTransfer.files).map(compressImage)); const n=[...prods]; n[i].images=[...n[i].images, ...urls]; setProds(n);}} className="w-40 h-20 border border-dashed border-gray-300 flex items-center justify-center text-[10px] text-gray-400">DROP IMAGE</div>
+                            <button onClick={()=>setProds(prods.filter(it=>it.id!==p.id))} className="text-gray-300 hover:text-red-500"><X size={16}/></button>
+                        </div>
+                    ))}
+                    <button onClick={handleSave} className={`w-full py-4 text-xs tracking-widest uppercase transition-all ${saving ? 'save-success text-white' : 'bg-black text-white'}`}>{saving ? 'SAVED' : 'SAVE CATALOG'}</button>
+                </div>
+            );
+        };
+
+        const ShippingTab = ({ collection, onUpdate }) => {
+            const [orders, setOrders] = useState([...collection.orders]);
+            return (
+                <div className="space-y-6 animate-fade-in">
+                    <div className="flex justify-end"><button onClick={()=>onUpdate({...collection, orders})} className="bg-black text-white px-6 py-2 text-[10px] uppercase font-bold">Save Orders</button></div>
+                    <div className="border rounded overflow-hidden"><table className="w-full text-left text-[10px] uppercase"><thead className="bg-gray-50 border-b"><tr><th className="p-4">Status</th><th className="p-4">Name</th><th className="p-4">Product</th><th className="p-4">Action</th></tr></thead><tbody>{orders.map(o=>(<tr key={o.id} className="border-b"><td className="p-4 font-bold">{o.status}</td><td className="p-4">{o.name}</td><td className="p-4">{o.productName} ({o.size})</td><td className="p-4"><button onClick={()=>setOrders(orders.filter(it=>it.id!==o.id))}><Trash2 size={14}/></button></td></tr>))}</tbody></table></div>
+                </div>
+            );
+        };
+
+        const AdminDashboard = ({ collections, onUpdateCollection, onAddCollection, onDeleteCollection, onLogout }) => {
             const [activeColId, setActiveColId] = useState(null);
             const [tab, setTab] = useState('Settings');
             const [msg, setMsg] = useState(null);
             const activeCol = useMemo(() => collections.find(c => c.id === activeColId), [collections, activeColId]);
 
-            const showMsg = (text, type = 'success') => { setMsg({ text, type }); setTimeout(() => setMsg(null), 3000); };
-
-            const safeUpdate = (data) => {
-                try {
-                    onUpdateCollection(data);
-                    showMsg('Saved Successfully');
-                    return true;
-                } catch (e) {
-                    showMsg('STORAGE FULL! CANNOT SAVE.', 'error');
-                    return false;
-                }
-            };
-
             if (!activeColId) return (
-                <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-                    <StorageMonitor />
-                    <div className="w-full max-w-xl bg-white shadow-xl p-12 space-y-12 border border-gray-100">
-                        <div className="flex justify-between items-center border-b pb-6">
-                            <h1 className="text-xl font-light tracking-[0.2em] uppercase italic">nuuanu Admin</h1>
-                            <button onClick={onLogout} className="text-gray-400 hover:text-black"><LogOut size={18} /></button>
-                        </div>
-                        <div className="space-y-4">
-                            {collections.map(c => (
-                                <div key={c.id} className="flex gap-2">
-                                    <button onClick={() => setActiveColId(c.id)} className="flex-1 text-left p-6 border border-gray-100 hover:border-black transition-all flex justify-between items-center group">
-                                        <span className="text-sm font-medium uppercase tracking-widest">{c.name}</span>
-                                        <span className="text-[10px] text-gray-400 group-hover:text-black font-bold">{c.orders.length} ORDERS</span>
-                                    </button>
-                                    <button onClick={() => { if(confirm('Delete this collection and all its data?')) onDeleteCollection(c.id); }} className="px-4 border border-gray-100 hover:text-red-500"><Trash2 size={16} /></button>
-                                </div>
-                            ))}
-                            <button onClick={()=>onAddCollection({ id: Math.random().toString(36).substr(2,9), name: prompt('Collection Name?'), accessCodes: [], lookbook: [], products: [], orders: [], descriptionTitle: '', descriptionBody: '' })} className="w-full border border-dashed p-6 text-gray-300 hover:border-black hover:text-black transition-all flex items-center justify-center gap-2"><Plus size={16} /><span className="text-xs uppercase tracking-widest">New Collection</span></button>
-                        </div>
+                <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50">
+                    <div className="w-full max-w-md bg-white p-10 shadow-xl space-y-8">
+                        <div className="flex justify-between border-b pb-4"><h1 className="font-bold italic uppercase tracking-widest">Admin</h1><button onClick={onLogout}><LogOut size={16}/></button></div>
+                        {collections.map(c=>(<button key={c.id} onClick={()=>setActiveColId(c.id)} className="w-full p-6 border hover:border-black flex justify-between uppercase text-xs"><span>{c.name}</span><b>{c.orders.length}</b></button>))}
+                        <button onClick={()=>onAddCollection({id:Math.random(), name:prompt('Name?'), accessCodes:[], lookbook:[], products:[], orders:[], descriptionTitle:'', descriptionBody:''})} className="w-full border-dashed border p-4 text-gray-400 text-xs">+ New Collection</button>
                     </div>
                 </div>
             );
 
             return (
-                <div className="min-h-screen bg-[#fafafa] flex">
-                    <StorageMonitor />
-                    <aside className="w-64 bg-white border-r fixed inset-y-0 p-4 space-y-8">
-                        <div className="p-4 text-center border-b"><h1 className="text-sm font-light italic uppercase tracking-[0.2em]">nuuanu</h1></div>
-                        <nav className="space-y-1">
-                            {[{ id: 'Settings', icon: Settings, label: 'Setup' }, { id: 'Products', icon: Package, label: 'Products' }, { id: 'Shipping', icon: Truck, label: 'Orders' }, { id: 'Report', icon: BarChart3, label: 'Analytics' }].map(item => (
-                                <button key={item.id} onClick={()=>setTab(item.id)} className={`w-full flex items-center gap-3 p-4 rounded-lg text-[10px] font-bold uppercase tracking-[0.15em] transition-all ${tab===item.id ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:bg-gray-50'}`}><item.icon size={18} /> {item.label}</button>
-                            ))}
+                <div className="min-h-screen bg-white flex">
+                    <aside className="w-64 border-r p-6 space-y-8 fixed inset-y-0">
+                        <h2 className="font-bold italic uppercase tracking-tighter">nuuanu admin</h2>
+                        <nav className="space-y-2">
+                            {['Settings', 'Products', 'Shipping'].map(t=>(<button key={t} onClick={()=>setTab(t)} className={`w-full text-left p-4 text-[10px] font-bold uppercase tracking-widest transition-all ${tab===t ? 'bg-black text-white' : 'text-gray-400 hover:bg-gray-50'}`}>{t}</button>))}
                         </nav>
-                        <div className="absolute bottom-4 left-4 right-4"><button onClick={()=>setActiveColId(null)} className="w-full flex items-center gap-3 p-4 text-[10px] uppercase text-gray-400 hover:text-black"><ChevronDown size={14} className="rotate-90"/> Collections</button></div>
+                        <button onClick={()=>setActiveColId(null)} className="absolute bottom-6 left-6 text-[10px] uppercase text-gray-400">← Back</button>
                     </aside>
-                    <main className="flex-1 ml-64 p-12">
-                        <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
-                            <div className="flex justify-between items-end border-b pb-8">
-                                <div><p className="text-[10px] uppercase tracking-widest text-gray-400 mb-2 font-bold">{tab}</p><h2 className="text-3xl font-light uppercase tracking-[0.2em]">{activeCol.name}</h2></div>
-                                {msg && <div className={`px-6 py-2 rounded-full text-[10px] uppercase tracking-widest animate-fade-in font-bold ${msg.type === 'error' ? 'bg-red-500 text-white' : 'bg-black text-white'}`}>{msg.text}</div>}
-                            </div>
-                            <div className="bg-white p-10 shadow-sm min-h-[600px] border border-gray-100 relative">
-                                {tab==='Settings' && <SettingsTab collection={activeCol} adminConfig={adminConfig} onUpdateAdminConfig={onUpdateAdminConfig} onUpdate={safeUpdate} />}
-                                {tab==='Products' && <ProductsTab collection={activeCol} onUpdate={safeUpdate} />}
-                                {tab==='Shipping' && <ShippingTab collection={activeCol} onUpdate={safeUpdate} />}
-                                {tab==='Report' && <ReportTab collection={activeCol} />}
-                            </div>
+                    <main className="flex-1 ml-64 p-12 max-w-5xl">
+                        <div className="flex justify-between border-b pb-6 mb-8">
+                            <h2 className="text-2xl font-light uppercase tracking-widest">{activeCol.name} / {tab}</h2>
+                            {msg && <span className="bg-black text-white px-4 py-1 text-[10px] animate-fade-in">{msg}</span>}
                         </div>
+                        {tab==='Settings' && <SettingsTab collection={activeCol} onUpdate={onUpdateCollection} showMsg={setMsg}/>}
+                        {tab==='Products' && <ProductsTab collection={activeCol} onUpdate={onUpdateCollection} showMsg={setMsg}/>}
+                        {tab==='Shipping' && <ShippingTab collection={activeCol} onUpdate={onUpdateCollection}/>}
+                        <StorageMonitor />
                     </main>
                 </div>
             );
         };
 
-        // --- Settings Tab with Drag & Drop & Instant Save Feedback ---
-        const SettingsTab = ({ collection, adminConfig, onUpdateAdminConfig, onUpdate }) => {
-            const [lc, setLc] = useState({...collection});
-            const [saving, setSaving] = useState(false);
-
-            const handleSave = async () => {
-                setSaving(true);
-                const success = await onUpdate(lc);
-                setSaving(false);
-            };
-
-            return (
-                <div className="space-y-16 animate-fade-in">
-                    <section className="grid grid-cols-1 md:grid-cols-2 gap-16">
-                        <div className="space-y-8">
-                            <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-4">Portal Info</h3>
-                            <InputField label="Collection Display Name" value={lc.name} onChange={v => setLc({...lc, name: v})} />
-                            <InputField label="Welcome Title" value={lc.descriptionTitle} onChange={v => setLc({...lc, descriptionTitle: v})} />
-                            <div className="space-y-1.5"><label className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Body Text</label><textarea value={lc.descriptionBody} onChange={e=>setLc({...lc, descriptionBody:e.target.value})} className="w-full border-b border-gray-200 py-2 focus:outline-none focus:border-black bg-transparent text-sm h-24 resize-none"/></div>
-                        </div>
-                        <div className="space-y-8">
-                            <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-4">Brand Logo</h3>
-                            <label className="block border border-dashed p-10 text-center cursor-pointer hover:border-black transition-all">
-                                {lc.logoUrl ? <img src={lc.logoUrl} className="h-10 mx-auto" /> : <Upload size={20} className="mx-auto text-gray-300"/>}
-                                <input type="file" className="hidden" onChange={async e => { if(e.target.files[0]) setLc({...lc, logoUrl: await compressImage(e.target.files[0])}); }} />
-                            </label>
-                        </div>
-                    </section>
-
-                    <section className="space-y-6">
-                        <h3 className="text-xs font-bold uppercase tracking-widest">Access Codes</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {lc.accessCodes.map((ac, i) => (
-                                <div key={i} className="flex gap-4 items-center bg-gray-50 p-4 border border-gray-100">
-                                    <div className="flex-1"><InputField label="Code" value={ac.code} onChange={v => { const c=[...lc.accessCodes]; c[i].code=v.toUpperCase(); setLc({...lc, accessCodes:c}); }} /></div>
-                                    <div className="w-24"><InputField label="Qty Limit" type="number" value={ac.limit} onChange={v => { const c=[...lc.accessCodes]; c[i].limit=parseInt(v); setLc({...lc, accessCodes:c}); }} /></div>
-                                    <button onClick={()=>setLc({...lc, accessCodes: lc.accessCodes.filter((_, idx)=>idx!==i)})} className="mt-4 text-gray-300 hover:text-red-500"><Trash2 size={16}/></button>
-                                </div>
-                            ))}
-                            <button onClick={()=>setLc({...lc, accessCodes:[...lc.accessCodes, {code:'', limit:3}]})} className="border border-dashed p-4 text-[10px] uppercase text-gray-400 hover:text-black">+ Add Code</button>
-                        </div>
-                    </section>
-
-                    <section className="space-y-6">
-                        <h3 className="text-xs font-bold uppercase tracking-widest">Lookbook (Drag & Drop)</h3>
-                        <div onDragOver={e=>e.preventDefault()} onDrop={async e=>{ e.preventDefault(); const files=Array.from(e.dataTransfer.files); const urls = await Promise.all(files.map(f=>compressImage(f))); setLc({...lc, lookbook:[...lc.lookbook, ...urls.map(u=>({id:Math.random(),url:u}))]}); }} className="flex flex-wrap gap-4 min-h-[150px] border border-dashed p-6 border-gray-200 hover:border-black transition-all">
-                            {lc.lookbook.map(lb => (
-                                <div key={lb.id} className="relative w-24 aspect-lookbook border group overflow-hidden">
-                                    <img src={lb.url} className="w-full h-full object-cover"/>
-                                    <button onClick={()=>setLc({...lc, lookbook: lc.lookbook.filter(i=>i.id!==lb.id)})} className="absolute inset-0 bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100"><X size={14}/></button>
-                                </div>
-                            ))}
-                        </div>
-                    </section>
-
-                    <div className="flex justify-end pt-10 sticky bottom-0 bg-white/90 py-6 border-t z-10">
-                        <button onClick={handleSave} className={`px-12 py-4 text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 ${saving ? 'save-success text-white' : 'bg-black text-white hover:bg-zinc-800'}`}>
-                            {saving ? <Check size={16}/> : <Save size={16}/>} {saving ? 'SAVED' : 'SAVE CHANGES'}
-                        </button>
-                    </div>
-                </div>
-            );
-        };
-
-        // --- (기타 ShippingTab, ReportTab, InfluencerPage, App 컴포넌트는 이전 코드와 동일하게 유지되나, App의 localStorage Key만 v5로 변경하여 충돌 방지) ---
-        // ... 생략 (위의 전체 코드 흐름과 동일하게 ProductsTab 등 구성) ...
-
-        // --- ProductsTab ---
-        const ProductsTab = ({ collection, onUpdate }) => {
-            const [prods, setProds] = useState([...collection.products]);
-            const [saving, setSaving] = useState(false);
-            const handleSave = async () => { setSaving(true); await onUpdate({...collection, products: prods}); setSaving(false); };
-
-            return (
-                <div className="space-y-12 animate-fade-in">
-                    <section className="flex justify-between items-center border-b pb-8">
-                        <h3 className="text-xs font-bold uppercase tracking-widest">Catalog</h3>
-                        <button onClick={()=>setProds([...prods, {id: Math.random().toString(36).substr(2,9), name: 'New Item', options: ['S','M','L'], summary: '', images: []}])} className="bg-black text-white px-6 py-3 text-[10px] uppercase font-bold">+ New Item</button>
-                    </section>
-                    <div className="space-y-4">
-                        {prods.map((p, i) => (
-                            <div key={p.id} className="flex gap-6 items-start p-6 bg-gray-50 border border-gray-100 group relative">
-                                <div className="flex-1 grid grid-cols-4 gap-6">
-                                    <div className="col-span-1"><InputField label="Name" value={p.name} onChange={v => { const n=[...prods]; n[i].name=v; setProds(n); }} /></div>
-                                    <div className="col-span-3 space-y-1">
-                                        <label className="text-[10px] uppercase text-gray-400 font-bold">Summary</label>
-                                        <input value={p.summary} onChange={e=>{ const n=[...prods]; n[i].summary=e.target.value; setProds(n); }} className="w-full bg-white border border-gray-100 p-2 text-xs focus:outline-none"/>
-                                    </div>
-                                </div>
-                                <div onDragOver={e=>e.preventDefault()} onDrop={async e=>{e.preventDefault(); const files=Array.from(e.dataTransfer.files); const urls=await Promise.all(files.map(f=>compressImage(f))); const n=[...prods]; n[i].images=[...n[i].images, ...urls]; setProds(n);}} className="w-64 flex gap-2 flex-wrap justify-end min-h-[60px] border border-dashed border-transparent hover:border-black p-2 transition-all">
-                                    {p.images.map((img, idx) => (
-                                        <div key={idx} className="relative w-12 aspect-product border bg-white group/img">
-                                            <img src={img} className="w-full h-full object-cover"/><button onClick={()=>{const n=[...prods]; n[i].images=n[i].images.filter((_,j)=>j!==idx); setProds(n);}} className="absolute inset-0 bg-red-500/80 text-white flex items-center justify-center opacity-0 group-hover/img:opacity-100"><Trash2 size={10}/></button>
-                                        </div>
-                                    ))}
-                                    <label className="w-12 aspect-product border border-dashed border-gray-300 flex items-center justify-center text-gray-400 cursor-pointer bg-white hover:border-black"><Plus size={14}/><input type="file" multiple className="hidden" onChange={async e => { const base64s = await Promise.all(Array.from(e.target.files).map(f => compressImage(f))); const n=[...prods]; n[i].images=[...n[i].images, ...base64s]; setProds(n); }}/></label>
-                                </div>
-                                <button onClick={()=>setProds(prods.filter(it=>it.id!==p.id))} className="absolute top-2 right-2 text-gray-200 hover:text-red-500"><X size={16}/></button>
-                            </div>
-                        ))}
-                    </div>
-                    <div className="flex justify-end pt-10 sticky bottom-0 bg-white/90 py-6 border-t z-10">
-                        <button onClick={handleSave} className={`px-12 py-4 text-xs uppercase tracking-[0.2em] transition-all flex items-center gap-2 ${saving ? 'save-success text-white' : 'bg-black text-white hover:bg-zinc-800'}`}>
-                            {saving ? <Check size={16}/> : <Save size={16}/>} {saving ? 'SAVED' : 'SAVE CATALOG'}
-                        </button>
-                    </div>
-                </div>
-            );
-        };
-
-        // --- (나머지 InfluencerPage, App 등은 이전과 동일 구조로 통합) ---
-        // ... (간략화를 위해 생략되나 전체 실행을 위해서는 이전 답변의 InfluencerPage, ShippingTab, ReportTab, App 로직을 포함해야 함)
-        
-        // --- InfluencerPage (Same as before) ---
         const InfluencerPage = ({ collection, limit, onLogout, onOrderSubmit }) => {
             const [view, setView] = useState('shop');
             const [cart, setCart] = useState([]);
-            const [formData, setFormData] = useState({ instagramId: '', name: '', phone: '', address: '', message: '', agreed: false });
+            const [formData, setFormData] = useState({ instagramId: '', name: '', phone: '', address: '', agreed: false });
 
             useEffect(() => {
                 if (view === 'shop') {
@@ -335,119 +193,84 @@
             }, [view]);
 
             return (
-                <div className="min-h-screen bg-white pb-20">
-                    <header className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-50 px-6 py-6 flex justify-between items-center">
-                        <h1 className="text-lg font-light italic tracking-widest uppercase cursor-pointer" onClick={() => setView('shop')}>
-                            {collection.logoUrl ? <img src={collection.logoUrl} className="h-6" /> : 'nuuanu'}
-                        </h1>
-                        <div className="flex items-center gap-6">
-                            <button onClick={() => setView('cart')} className="relative flex items-center gap-2">
-                                <ShoppingBag size={18} />
-                                <span className="text-[10px] font-bold">{cart.length}/{limit}</span>
-                            </button>
-                            <button onClick={onLogout} className="text-gray-400 hover:text-black"><LogOut size={16} /></button>
+                <div className="min-h-screen bg-white">
+                    <header className="p-6 border-b flex justify-between items-center sticky top-0 bg-white/80 backdrop-blur-md z-50">
+                        <h1 className="font-bold italic uppercase tracking-widest">nuuanu</h1>
+                        <div className="flex gap-6 items-center">
+                            <button onClick={()=>setView('cart')} className="text-xs font-bold uppercase tracking-widest">Cart ({cart.length}/{limit})</button>
+                            <button onClick={onLogout}><LogOut size={16}/></button>
                         </div>
                     </header>
-
-                    {view === 'shop' && (
-                        <main className="max-w-6xl mx-auto px-6 py-12 space-y-24 animate-fade-in">
-                            <section className="text-center space-y-6 max-w-2xl mx-auto">
-                                <h2 className="text-2xl font-light uppercase tracking-[0.2em]">{collection.descriptionTitle}</h2>
-                                <p className="text-xs text-gray-500 leading-relaxed font-light whitespace-pre-wrap">{collection.descriptionBody}</p>
+                    {view === 'shop' ? (
+                        <main className="max-w-6xl mx-auto p-6 space-y-20 animate-fade-in">
+                            <section className="text-center space-y-4 pt-10">
+                                <h2 className="text-xl font-light uppercase tracking-[0.3em]">{collection.descriptionTitle}</h2>
+                                <p className="text-[10px] text-gray-500 max-w-md mx-auto">{collection.descriptionBody}</p>
                             </section>
                             <section className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                {collection.lookbook.map(img => (
-                                    <div key={img.id} className="aspect-lookbook bg-gray-50"><img src={img.url} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700" /></div>
-                                ))}
+                                {collection.lookbook.map(img=>(<div key={img.id} className="aspect-lookbook"><img src={img.url} className="w-full h-full object-cover grayscale hover:grayscale-0 transition-all duration-700"/></div>))}
                             </section>
-                            <section className="grid grid-cols-1 md:grid-cols-3 gap-y-20 gap-x-12">
-                                {collection.products.map(product => (
-                                    <div key={product.id} className="space-y-6">
-                                        <div className="aspect-product bg-gray-50 overflow-hidden">{product.images?.[0] && <img src={product.images[0]} className="w-full h-full object-cover" />}</div>
-                                        <div className="space-y-4">
-                                            <div className="flex justify-between items-start"><h3 className="text-xs font-medium uppercase tracking-widest">{product.name}</h3><p className="text-[10px] text-gray-400 uppercase">{product.summary}</p></div>
-                                            <div className="flex flex-wrap gap-2">{product.options.map(size => (<button key={size} onClick={() => cart.length < limit ? setCart([...cart, {product, size}]) : alert(`Limit ${limit} items`)} className="px-4 py-2 border border-gray-100 text-[10px] uppercase hover:border-black transition-all">Select {size}</button>))}</div>
-                                        </div>
+                            <section className="grid grid-cols-1 md:grid-cols-3 gap-12">
+                                {collection.products.map(p=>(
+                                    <div key={p.id} className="space-y-4">
+                                        <div className="aspect-product bg-gray-50">{p.images[0] && <img src={p.images[0]} className="w-full h-full object-cover"/>}</div>
+                                        <div className="flex justify-between items-end"><h3 className="text-xs font-bold uppercase tracking-tighter">{p.name}</h3></div>
+                                        <div className="flex gap-2">{p.options.map(s=>(<button key={s} onClick={()=>cart.length < limit ? setCart([...cart, {product:p, size:s}]) : alert('Limit reached')} className="flex-1 border border-gray-100 py-2 text-[10px] uppercase hover:border-black">Select {s}</button>))}</div>
                                     </div>
                                 ))}
                             </section>
                         </main>
-                    )}
-
-                    {view === 'cart' && (
-                        <div className="max-w-2xl mx-auto px-6 py-20 space-y-16 animate-fade-in">
-                            <h2 className="text-xs font-bold uppercase tracking-[0.3em] border-b pb-6 text-center">Your Selection</h2>
-                            <div className="space-y-6">
-                                {cart.map((item, i) => (
-                                    <div key={i} className="flex gap-6 items-center border-b border-gray-50 pb-6">
-                                        <div className="w-16 aspect-product bg-gray-50 overflow-hidden">{item.product.images?.[0] && <img src={item.product.images[0]} className="w-full h-full object-cover" />}</div>
-                                        <div className="flex-1"><h3 className="text-xs font-medium uppercase tracking-widest">{item.product.name}</h3><p className="text-[10px] text-gray-400 uppercase">Size: {item.size}</p></div>
-                                        <button onClick={() => setCart(cart.filter((_, idx) => idx !== i))} className="text-gray-300 hover:text-black"><X size={18} /></button>
-                                    </div>
-                                ))}
+                    ) : (
+                        <div className="max-w-xl mx-auto p-6 pt-20 space-y-12 animate-fade-in">
+                            <h2 className="text-center font-bold uppercase tracking-widest border-b pb-4">Checkout</h2>
+                            <div className="space-y-4">
+                                {cart.map((item, idx)=>(<div key={idx} className="flex justify-between items-center border-b pb-4 text-xs"><span>{item.product.name} ({item.size})</span><button onClick={()=>setCart(cart.filter((_,i)=>i!==idx))}><X size={14}/></button></div>))}
                             </div>
-                            {cart.length > 0 && (
-                                <div className="space-y-12 animate-fade-in">
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <InputField label="Instagram ID" required value={formData.instagramId} onChange={v => setFormData({...formData, instagramId: v})} />
-                                        <InputField label="Name" required value={formData.name} onChange={v => setFormData({...formData, name: v})} />
-                                        <InputField label="Phone" required value={formData.phone} onChange={v => setFormData({...formData, phone: v})} />
-                                        <InputField label="Address" required value={formData.address} onChange={v => setFormData({...formData, address: v})} />
-                                    </div>
-                                    <button onClick={() => { onOrderSubmit(cart.map(item => ({ id: Math.random().toString(36).substr(2, 9), status: 'Preparing', date: new Date().toLocaleDateString(), ...formData, productName: item.product.name, size: item.size }))); setView('success'); }} className="w-full bg-black text-white py-6 text-xs tracking-[0.3em] font-medium uppercase transition-all">Submit Order</button>
-                                </div>
-                            )}
+                            <div className="space-y-6">
+                                <InputField label="Instagram ID" value={formData.instagramId} onChange={v=>setFormData({...formData, instagramId:v})} />
+                                <InputField label="Name" value={formData.name} onChange={v=>setFormData({...formData, name:v})} />
+                                <InputField label="Phone" value={formData.phone} onChange={v=>setFormData({...formData, phone:v})} />
+                                <InputField label="Address" value={formData.address} onChange={v=>setFormData({...formData, address:v})} />
+                                <button onClick={()=>{onOrderSubmit(cart.map(c=>({id:Math.random(), status:'Preparing', date:new Date().toLocaleDateString(), ...formData, productName:c.product.name, size:c.size}))); setView('success');}} className="w-full bg-black text-white py-4 text-xs font-bold uppercase tracking-widest">Submit</button>
+                            </div>
                         </div>
                     )}
-                    {view === 'success' && <div className="min-h-[80vh] flex items-center justify-center text-center px-6"><div className="max-w-md space-y-8 animate-fade-in"><h2 className="text-xl font-light italic leading-relaxed uppercase tracking-widest">Order Submitted!</h2><button onClick={onLogout} className="px-12 py-4 border border-black text-[10px] uppercase tracking-[0.3em]">Exit</button></div></div>}
-                </div>
-            );
-        };
-
-        const ShippingTab = ({ collection, onUpdate }) => {
-            const [orders, setOrders] = useState([...collection.orders]);
-            return (
-                <div className="space-y-8 animate-fade-in">
-                    <div className="flex justify-end"><button onClick={()=>onUpdate({...collection, orders})} className="bg-black text-white px-8 py-3 text-[10px] uppercase font-bold tracking-widest">Save Changes</button></div>
-                    <div className="overflow-x-auto border rounded-sm"><table className="w-full text-[10px] uppercase text-left border-collapse min-w-[800px]"><thead className="bg-gray-50 border-b"><tr><th className="p-4">Status</th><th className="p-4">Date</th><th className="p-4">Instagram</th><th className="p-4">Product</th><th className="p-4">Action</th></tr></thead><tbody>{orders.map(o=>(<tr key={o.id} className="border-b"><td className="p-4 font-bold">{o.status}</td><td className="p-4 text-gray-400">{o.date}</td><td className="p-4 font-bold">{o.instagramId}</td><td className="p-4">{o.productName} ({o.size})</td><td className="p-4"><button onClick={()=>setOrders(orders.filter(it=>it.id!==o.id))} className="text-gray-300 hover:text-red-500"><Trash2 size={14}/></button></td></tr>))}</tbody></table></div>
-                </div>
-            );
-        };
-
-        const ReportTab = ({ collection }) => {
-            const stats = useMemo(() => {
-                const p = {}; collection.orders.forEach(o=>{ p[o.productName]=(p[o.productName]||0)+1; });
-                return Object.entries(p).map(([name, value])=>({ name, value }));
-            }, [collection]);
-            return (
-                <div className="h-[400px] py-10 animate-fade-in">
-                    <ResponsiveContainer width="100%" height="100%"><BarChart data={stats}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="name" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}}/><Tooltip/><Bar dataKey="value" fill="#000"/></BarChart></ResponsiveContainer>
+                    {view === 'success' && <div className="fixed inset-0 bg-white flex items-center justify-center text-center p-6"><div className="space-y-6"><h2 className="text-2xl uppercase tracking-widest italic">Order Submitted!</h2><button onClick={onLogout} className="border border-black px-10 py-3 text-[10px] uppercase font-bold">Close</button></div></div>}
                 </div>
             );
         };
 
         const App = () => {
-            const [collections, setCollections] = useState(() => {
-                const saved = localStorage.getItem('nuuanu_v5');
-                return saved ? JSON.parse(saved) : INITIAL_COLLECTIONS;
-            });
-            const [adminConfig, setAdminConfig] = useState({ password: 'ADMIN', recoveryPhrase: 'nuuanu' });
+            const [collections, setCollections] = useState(() => JSON.parse(localStorage.getItem('nuuanu_v7')) || [{id:'init', name:'25FW', accessCodes:[{code:'NUUANU25', limit:3}], lookbook:[], products:[], orders:[], descriptionTitle:'WELCOME', descriptionBody:''}]);
             const [session, setSession] = useState(null);
+            const [code, setCode] = useState('');
 
-            useEffect(() => { localStorage.setItem('nuuanu_v5', JSON.stringify(collections)); }, [collections]);
+            useEffect(() => { localStorage.setItem('nuuanu_v7', JSON.stringify(collections)); }, [collections]);
 
-            const handleLogin = (code) => {
-                if (code === adminConfig.password) { setSession({ role: 'admin' }); return true; }
-                const col = collections.find(c => c.accessCodes.some(ac => ac.code === code));
-                if (col) { setSession({ role: 'influencer', collectionId: col.id, limit: col.accessCodes.find(ac=>ac.code===code).limit }); return true; }
-                return false;
+            const login = () => {
+                if(code === 'ADMIN') setSession({role:'admin'});
+                else {
+                    const col = collections.find(c => c.accessCodes.some(ac => ac.code === code));
+                    if(col) setSession({role:'influencer', id:col.id, limit: col.accessCodes.find(ac=>ac.code===code).limit});
+                    else alert('Invalid Code');
+                }
             };
 
-            if (!session) return <LoginPage onLogin={handleLogin} />;
-            if (session.role === 'admin') return <AdminDashboard collections={collections} adminConfig={adminConfig} onUpdateCollection={updated => setCollections(collections.map(c => c.id === updated.id ? updated : c))} onAddCollection={newCol => setCollections([...collections, newCol])} onDeleteCollection={id => setCollections(collections.filter(c => c.id !== id))} onLogout={() => setSession(null)} />;
-            
-            const activeCol = collections.find(c => c.id === session.collectionId);
-            return <InfluencerPage collection={activeCol} limit={session.limit} onLogout={() => setSession(null)} onOrderSubmit={newOrders => setCollections(collections.map(c => c.id === activeCol.id ? {...activeCol, orders: [...activeCol.orders, ...newOrders]} : c))} />;
+            if(!session) return (
+                <div className="min-h-screen flex items-center justify-center bg-white p-6">
+                    <div className="w-full max-w-sm text-center space-y-10 animate-fade-in">
+                        <h1 className="text-3xl italic font-light uppercase tracking-widest">nuuanu</h1>
+                        <div className="space-y-4">
+                            <input type="text" placeholder="ENTER CODE" value={code} onChange={e=>setCode(e.target.value.toUpperCase())} className="w-full border-b py-3 text-center focus:outline-none tracking-widest text-sm" />
+                            <button onClick={login} className="w-full bg-black text-white py-4 text-[10px] font-bold uppercase tracking-widest">Enter</button>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            if(session.role === 'admin') return <AdminDashboard collections={collections} onUpdateCollection={upd => setCollections(collections.map(c => c.id === upd.id ? upd : c))} onAddCollection={newC => setCollections([...collections, newC])} onDeleteCollection={id => setCollections(collections.filter(c => c.id !== id))} onLogout={()=>setSession(null)} />;
+            const activeCol = collections.find(c => c.id === session.id);
+            return <InfluencerPage collection={activeCol} limit={session.limit} onLogout={()=>setSession(null)} onOrderSubmit={newO => setCollections(collections.map(c => c.id === activeCol.id ? {...activeCol, orders:[...activeCol.orders, ...newO]} : c))} />;
         };
 
         createRoot(document.getElementById('root')).render(<App />);
