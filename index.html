@@ -1,687 +1,785 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>nuuanu | Brand Seeding Management</title>
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap');
-        
-        body {
-            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-            background-color: #ffffff;
-            color: #1a1a1a;
-            -webkit-font-smoothing: antialiased;
-        }
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { createRoot } from 'react-dom/client';
+import { 
+    ShoppingBag, X, ChevronLeft, ChevronRight, ArrowLeft, 
+    Settings, Package, Truck, BarChart3, Plus, Trash2, 
+    Download, Copy, Save, LogOut, ChevronDown, ArrowUpDown, 
+    Upload, FileText, Check
+} from 'lucide-react';
+import { 
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
+    ResponsiveContainer, Cell 
+} from 'recharts';
 
-        .aspect-lookbook { aspect-ratio: 1 / 1.5; }
-        .aspect-product { aspect-ratio: 2 / 3; }
+// --- Utils ---
+const getStorageUsage = () => {
+    const total = 5 * 1024 * 1024; // 5MB limit
+    const used = JSON.stringify(localStorage).length;
+    return { used, total, percent: (used / total) * 100 };
+};
 
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+const compressImage = async (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (e) => {
+            const img = new Image();
+            img.src = e.target?.result as string;
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 1000;
+                let width = img.width;
+                let height = img.height;
+                if (width > MAX_WIDTH) {
+                    height *= MAX_WIDTH / width;
+                    width = MAX_WIDTH;
+                }
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx?.drawImage(img, 0, 0, width, height);
+                resolve(canvas.toDataURL('image/jpeg', 0.7)); // 70% quality
+            };
+        };
+    });
+};
 
-        .animate-fade-in {
-            animation: fadeIn 0.5s ease-out;
-        }
+// --- Sub-Components ---
+const InputField = ({ label, required, value, onChange }: any) => (
+    <div className="space-y-2">
+        <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">
+            {label} {required && '*'}
+        </label>
+        <input 
+            type="text" 
+            value={value || ''}
+            onChange={e => onChange(e.target.value)}
+            className="w-full border-b border-gray-200 py-2 focus:outline-none focus:border-black transition-colors text-sm"
+        />
+    </div>
+);
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
+const StorageMonitor = () => {
+    const [usage, setUsage] = useState(getStorageUsage());
+    useEffect(() => {
+        const interval = setInterval(() => setUsage(getStorageUsage()), 2000);
+        return () => clearInterval(interval);
+    }, []);
 
-        .transition-all { transition: all 0.3s ease-in-out; }
-        
-        /* Custom Checkbox */
-        .accent-black {
-            accent-color: #000;
-        }
-    </style>
-    <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@18.2.0",
-    "react-dom": "https://esm.sh/react-dom@18.2.0",
-    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-    "lucide-react": "https://esm.sh/lucide-react@0.344.0",
-    "recharts": "https://esm.sh/recharts@2.12.2",
-    "clsx": "https://esm.sh/clsx@2.1.0",
-    "tailwind-merge": "https://esm.sh/tailwind-merge@2.2.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/"
-  }
-}
-</script>
-</head>
-<body>
-    <div id="root"></div>
-
-    <!-- Babel for JSX transformation in the browser -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-    <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-        import { createRoot } from 'react-dom/client';
-        import { 
-            ShoppingBag, X, ChevronLeft, ChevronRight, ArrowLeft, 
-            Settings, Package, Truck, BarChart3, Plus, Trash2, 
-            Download, Copy, Save, LogOut, ChevronDown, ArrowUpDown, 
-            Upload, FileText, Key, CheckCircle 
-        } from 'lucide-react';
-        import { 
-            BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, 
-            ResponsiveContainer, Cell 
-        } from 'recharts';
-
-        // --- Constants & Initial Data ---
-        const INITIAL_COLLECTIONS = [
-            {
-                id: '25fw-id',
-                name: '25FW Collection',
-                logoUrl: '',
-                accessCodes: [
-                    { code: 'VIP25', limit: 3 },
-                    { code: 'GUEST', limit: 1 }
-                ],
-                descriptionTitle: '25FW: THE NEW ERA',
-                descriptionBody: 'Exploring the boundaries of minimal architecture through wearable art. Our Fall/Winter 2025 collection focuses on structured silhouettes and sustainable materials.',
-                lookbook: [
-                    { id: 'lb1', url: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=800&q=80' },
-                    { id: 'lb2', url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=800&q=80' },
-                    { id: 'lb3', url: 'https://images.unsplash.com/photo-1529139513055-1197978913e6?auto=format&fit=crop&w=800&q=80' },
-                    { id: 'lb4', url: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=800&q=80' }
-                ],
-                products: [
-                    {
-                        id: 'p1',
-                        name: 'Structured Wool Coat',
-                        price: 450000,
-                        options: ['1', '2'],
-                        summary: 'A signature piece with architectural shoulders.<br>100% Premium Wool.',
-                        images: ['https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=600&q=80']
-                    }
-                ],
-                orders: []
-            }
-        ];
-
-        // --- Helper Components ---
-        const InputField = ({ label, required, value, onChange, placeholder = "" }) => (
-            <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest font-bold text-gray-400">
-                    {label} {required && '*'}
-                </label>
-                <input 
-                    type="text" 
-                    value={value || ''}
-                    placeholder={placeholder}
-                    onChange={e => onChange(e.target.value)}
-                    className="w-full border-b border-gray-200 py-2 focus:outline-none focus:border-black transition-colors text-sm"
+    const isWarning = usage.percent > 80;
+    return (
+        <div className="fixed bottom-4 right-4 z-[100] bg-white border p-3 shadow-lg rounded-lg w-48 text-[10px] uppercase tracking-widest animate-fade-in">
+            <div className="flex justify-between mb-1 font-bold">
+                <span>Storage</span>
+                <span className={isWarning ? 'text-red-500 animate-pulse-red' : ''}>
+                    {isWarning ? 'WARNING ' : ''}{usage.percent.toFixed(1)}%
+                </span>
+            </div>
+            <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                <div 
+                    className={`h-full transition-all duration-500 ${isWarning ? 'bg-red-500' : 'bg-black'}`}
+                    style={{ width: `${Math.min(100, usage.percent)}%` }}
                 />
             </div>
-        );
+        </div>
+    );
+};
 
-        // --- Page Components ---
-        const LoginPage = ({ onLogin, onReset }) => {
-            const [code, setCode] = useState('');
-            const [error, setError] = useState(false);
-            const [isRecovery, setIsRecovery] = useState(false);
-            const [recoveryPhrase, setRecoveryPhrase] = useState('');
-            const [recoveryMsg, setRecoveryMsg] = useState('');
+const AnimatedSaveButton = ({ onSave, label = "Save Settings", className = "" }: any) => {
+    const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+    
+    const handleSave = async () => {
+        setState('saving');
+        const success = await onSave();
+        if (success) {
+            setState('saved');
+            setTimeout(() => setState('idle'), 1000);
+        } else {
+            setState('error');
+            setTimeout(() => setState('idle'), 3000);
+        }
+    };
 
-            return (
-                <div className="min-h-screen flex flex-col items-center justify-center bg-white px-4 animate-fade-in">
-                    <div className="w-full max-w-sm text-center">
-                        <h1 className="text-2xl font-light tracking-[0.2em] mb-12 uppercase italic">nuuanu</h1>
-                        {!isRecovery ? (
-                            <form onSubmit={(e) => { e.preventDefault(); if(!onLogin(code)) setError(true); }} className="space-y-6">
-                                <input 
-                                    type="text" placeholder="ACCESS CODE" value={code}
-                                    onChange={e => { setCode(e.target.value); setError(false); }}
-                                    className="w-full border-b border-gray-300 py-2 text-center focus:outline-none focus:border-black uppercase tracking-widest text-sm"
-                                />
-                                {error && <p className="text-red-500 text-[10px] uppercase tracking-widest mt-2">Invalid access code</p>}
-                                <button type="submit" className="w-full bg-black text-white py-4 text-xs tracking-[0.3em] font-medium uppercase hover:bg-zinc-800 transition-colors">Enter</button>
-                                <button type="button" onClick={() => setIsRecovery(true)} className="text-[10px] uppercase tracking-widest text-gray-400 mt-4 underline decoration-gray-200">Forgot admin password?</button>
-                            </form>
-                        ) : (
-                            <form onSubmit={(e) => { e.preventDefault(); if(onReset(recoveryPhrase)) { setRecoveryMsg('Password reset to ADMIN.'); setTimeout(()=>setIsRecovery(false), 2000); } else setRecoveryMsg('Incorrect phrase.'); }} className="space-y-6">
-                                <input 
-                                    type="text" placeholder="RECOVERY PHRASE" value={recoveryPhrase}
-                                    onChange={e => setRecoveryPhrase(e.target.value)}
-                                    className="w-full border-b border-gray-300 py-2 text-center focus:outline-none focus:border-black uppercase tracking-widest text-sm"
-                                />
-                                {recoveryMsg && <p className="text-[10px] uppercase tracking-widest">{recoveryMsg}</p>}
-                                <button type="submit" className="w-full bg-black text-white py-4 text-xs tracking-[0.3em] font-medium uppercase">Reset Access</button>
-                                <button type="button" onClick={() => setIsRecovery(false)} className="text-[10px] uppercase tracking-widest text-gray-400">Back</button>
-                            </form>
-                        )}
-                    </div>
+    return (
+        <button 
+            onClick={handleSave}
+            disabled={state === 'saving' || state === 'saved'}
+            className={`flex items-center gap-2 px-10 py-4 text-xs uppercase tracking-[0.2em] font-medium transition-all ${
+                state === 'saved' ? 'bg-green-600 text-white' : 
+                state === 'error' ? 'bg-red-600 text-white animate-pulse' : 
+                'bg-black text-white hover:bg-zinc-800'
+            } ${className}`}
+        >
+            {state === 'saved' ? <Check size={16}/> : state === 'error' ? <X size={16}/> : <Save size={16} />}
+            {state === 'saved' ? 'SAVED' : state === 'error' ? 'STORAGE FULL!' : label}
+        </button>
+    );
+};
+
+// --- Pages ---
+const LoginPage = ({ onLogin, onReset }: any) => {
+    const [code, setCode] = useState('');
+    const [error, setError] = useState(false);
+    const [isRecovery, setIsRecovery] = useState(false);
+    const [recoveryPhrase, setRecoveryPhrase] = useState('');
+    const [recoveryMsg, setRecoveryMsg] = useState('');
+
+    return (
+        <div className="min-h-screen flex flex-col items-center justify-center bg-white px-4 animate-fade-in">
+            <div className="w-full max-w-sm text-center">
+                <h1 className="text-2xl font-light tracking-[0.2em] mb-12 uppercase italic">nuuanu</h1>
+                {!isRecovery ? (
+                    <form onSubmit={(e) => { e.preventDefault(); if(!onLogin(code)) setError(true); }} className="space-y-6">
+                        <input 
+                            type="text" placeholder="ACCESS CODE" value={code}
+                            onChange={e => { setCode(e.target.value); setError(false); }}
+                            className="w-full border-b border-gray-300 py-2 text-center focus:outline-none focus:border-black uppercase tracking-widest text-sm"
+                        />
+                        {error && <p className="text-red-500 text-[10px] uppercase mt-2">Invalid access code</p>}
+                        <button type="submit" className="w-full bg-black text-white py-4 text-xs tracking-[0.3em] font-medium uppercase hover:bg-zinc-800 transition-colors">Enter</button>
+                        <button type="button" onClick={() => setIsRecovery(true)} className="text-[10px] uppercase tracking-widest text-gray-400 mt-4 underline decoration-gray-200">Forgot admin password?</button>
+                    </form>
+                ) : (
+                    <form onSubmit={(e) => { e.preventDefault(); if(onReset(recoveryPhrase)) { setRecoveryMsg('Password reset to ADMIN.'); setTimeout(()=>setIsRecovery(false), 2000); } else setRecoveryMsg('Incorrect phrase.'); }} className="space-y-6">
+                        <input 
+                            type="text" placeholder="RECOVERY PHRASE" value={recoveryPhrase}
+                            onChange={e => setRecoveryPhrase(e.target.value)}
+                            className="w-full border-b border-gray-300 py-2 text-center focus:outline-none focus:border-black uppercase tracking-widest text-sm"
+                        />
+                        {recoveryMsg && <p className="text-[10px] uppercase tracking-widest mt-2">{recoveryMsg}</p>}
+                        <button type="submit" className="w-full bg-black text-white py-4 text-xs tracking-[0.3em] font-medium uppercase">Reset Access</button>
+                        <button type="button" onClick={() => setIsRecovery(false)} className="text-[10px] uppercase tracking-widest text-gray-400">Back</button>
+                    </form>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const InfluencerPage = ({ collection, limit, onLogout, onOrderSubmit }: any) => {
+    const [view, setView] = useState('browse');
+    const [cart, setCart] = useState<any[]>([]);
+    const [selectedProduct, setSelectedProduct] = useState<any>(null);
+    const [tempSize, setTempSize] = useState<any>(null);
+    const [lookbookIdx, setLookbookIdx] = useState(0);
+    const [formData, setFormData] = useState({ instagramId: '', name: '', phone: '', address: '', message: '', agreed: false });
+    
+    // Persistent scroll position ref
+    const scrollPosRef = useRef(0);
+
+    const handleBackToBrowse = useCallback(() => {
+        setView('browse');
+        // Restore scroll after React renders
+        setTimeout(() => {
+            window.scrollTo({ top: scrollPosRef.current, behavior: 'instant' });
+        }, 0);
+    }, []);
+
+    const handleProductClick = useCallback((product: any) => {
+        scrollPosRef.current = window.scrollY;
+        setSelectedProduct(product);
+        setView('detail');
+    }, []);
+
+    const handleCartClick = useCallback(() => {
+        scrollPosRef.current = window.scrollY;
+        setView('cart');
+    }, []);
+
+    const handleConfirmAddToCart = () => {
+        if (cart.length >= limit) return alert(`Limit exceeded.`);
+        setCart([...cart, { product: selectedProduct, size: tempSize }]);
+        setTempSize(null);
+        setSelectedProduct(null);
+        handleBackToBrowse();
+    };
+
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
+    return (
+        <div className="min-h-screen bg-white">
+            <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b border-gray-100">
+                <div className="w-10"></div>
+                {collection.logoUrl ? <img src={collection.logoUrl} className="h-6 object-contain" /> : <h1 className="text-xl font-light tracking-[0.2em] italic uppercase">nuuanu</h1>}
+                <div className="flex items-center gap-4">
+                    <button onClick={handleCartClick} className="relative p-2">
+                        <ShoppingBag size={20} />
+                        {cart.length > 0 && <span className="absolute top-0 right-0 bg-black text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center font-bold">{cart.length}</span>}
+                    </button>
+                    <button onClick={onLogout} className="text-[10px] uppercase font-medium tracking-widest">Logout</button>
                 </div>
-            );
-        };
+            </header>
 
-        const InfluencerPage = ({ collection, limit, onLogout, onOrderSubmit }) => {
-            const [view, setView] = useState('browse');
-            const [cart, setCart] = useState([]);
-            const [selectedProduct, setSelectedProduct] = useState(null);
-            const [tempSize, setTempSize] = useState(null);
-            const [lookbookIdx, setLookbookIdx] = useState(0);
-            const [formData, setFormData] = useState({ instagramId: '', name: '', phone: '', address: '', message: '', agreed: false });
-
-            const handleConfirmAddToCart = () => {
-                if (cart.length >= limit) return alert(`You can select up to ${limit} products.`);
-                setCart([...cart, { product: selectedProduct, size: tempSize }]);
-                setTempSize(null);
-                setSelectedProduct(null);
-                setView('browse');
-            };
-
-            const isMobile = window.innerWidth < 768;
-
-            return (
-                <div className="min-h-screen bg-white">
-                    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md px-6 py-4 flex justify-between items-center border-b border-gray-100">
-                        <div className="w-10"></div>
-                        {collection.logoUrl ? <img src={collection.logoUrl} className="h-6 object-contain" /> : <h1 className="text-xl font-light tracking-[0.2em] italic uppercase">nuuanu</h1>}
-                        <div className="flex items-center gap-4">
-                            <button onClick={() => setView('cart')} className="relative p-2">
-                                <ShoppingBag size={20} />
-                                {cart.length > 0 && <span className="absolute top-0 right-0 bg-black text-white text-[10px] w-4 h-4 rounded-full flex items-center justify-center">{cart.length}</span>}
-                            </button>
-                            <button onClick={onLogout} className="text-[10px] uppercase font-medium tracking-widest">Logout</button>
-                        </div>
-                    </header>
-
-                    {view === 'browse' && (
-                        <main className="max-w-6xl mx-auto pb-20 animate-fade-in">
-                            <section className="relative px-0 md:px-4 py-8">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-0 overflow-hidden">
-                                    <div className="hidden md:block">
-                                        <img src={collection.lookbook[lookbookIdx]?.url} className="w-full aspect-lookbook object-cover" />
-                                    </div>
-                                    <div className="w-full">
-                                        <img src={collection.lookbook[isMobile ? lookbookIdx : (lookbookIdx + 1 < collection.lookbook.length ? lookbookIdx + 1 : 0)]?.url} className="w-full aspect-lookbook object-cover" />
-                                    </div>
-                                </div>
-                                <button onClick={() => setLookbookIdx(p => Math.max(0, p - (isMobile ? 1 : 2)))} className="absolute left-6 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"><ChevronLeft size={48} /></button>
-                                <button onClick={() => setLookbookIdx(p => (p + (isMobile ? 1 : 2) >= collection.lookbook.length ? 0 : p + (isMobile ? 1 : 2)))} className="absolute right-6 top-1/2 -translate-y-1/2 text-white/70 hover:text-white"><ChevronRight size={48} /></button>
-                            </section>
-
-                            <section className="text-center px-6 py-20 max-w-2xl mx-auto">
-                                <h2 className="text-2xl font-light uppercase tracking-widest mb-6">{collection.descriptionTitle}</h2>
-                                <p className="text-sm text-gray-500 leading-relaxed font-light">{collection.descriptionBody}</p>
-                            </section>
-
-                            <section className="px-4 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-12">
-                                {collection.products.map(p => (
-                                    <div key={p.id} onClick={() => { setSelectedProduct(p); setView('detail'); }} className="group cursor-pointer">
-                                        <div className="aspect-product overflow-hidden bg-gray-50 mb-4">
-                                            <img src={p.images[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                                        </div>
-                                        <h3 className="text-xs font-medium uppercase tracking-wider">{p.name}</h3>
-                                        <p className="text-[10px] text-gray-400 uppercase">₩{p.price.toLocaleString()}</p>
-                                    </div>
-                                ))}
-                            </section>
-                        </main>
-                    )}
-
-                    {view === 'detail' && selectedProduct && (
-                        <div className="fixed inset-0 z-[60] bg-white overflow-y-auto animate-fade-in">
-                            <button onClick={() => { setView('browse'); setTempSize(null); }} className="fixed top-6 right-6 p-2 z-[70] bg-white/50 rounded-full hover:bg-white"><X size={24} /></button>
-                            <div className="flex flex-col md:flex-row min-h-screen">
-                                <div className="w-full md:w-1/2 space-y-4 p-4">
-                                    {selectedProduct.images.map((img, i) => <img key={i} src={img} className="w-full aspect-product object-cover" />)}
-                                </div>
-                                <div className="w-full md:w-1/2 p-10 md:sticky md:top-0 md:h-screen flex flex-col justify-center">
-                                    <div className="max-w-md mx-auto w-full space-y-8">
-                                        <h2 className="text-2xl font-light uppercase tracking-widest">{selectedProduct.name}</h2>
-                                        <div className="text-sm text-gray-600 leading-relaxed font-light" dangerouslySetInnerHTML={{ __html: selectedProduct.summary }} />
-                                        <div className="space-y-4">
-                                            <p className="text-[10px] uppercase tracking-widest font-bold">Select Size</p>
-                                            <div className="flex flex-wrap gap-2">
-                                                {selectedProduct.options.map(opt => (
-                                                    <button key={opt} onClick={() => setTempSize(opt)} className={`px-6 py-3 border text-xs tracking-widest uppercase transition-colors ${tempSize === opt ? 'border-black bg-black text-white' : 'border-gray-200 hover:border-black'}`}>{opt}</button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <button 
-                                            onClick={handleConfirmAddToCart} 
-                                            disabled={!tempSize}
-                                            className="w-full bg-black text-white py-5 text-xs tracking-[0.3em] font-medium disabled:bg-gray-100 uppercase transition-all"
-                                        >Add to Bag</button>
-                                        {cart.length >= limit && <p className="text-[10px] text-red-500 uppercase tracking-widest text-center">You can select up to {limit} products.</p>}
-                                    </div>
-                                </div>
+            {view === 'browse' && (
+                <main className="max-w-6xl mx-auto pb-20 animate-fade-in">
+                    <section className="relative px-0 md:px-4 py-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-0 overflow-hidden">
+                            <div className="hidden md:block">
+                                <img src={collection.lookbook[lookbookIdx]?.url} className="w-full aspect-lookbook object-cover" />
+                            </div>
+                            <div className="w-full">
+                                <img src={collection.lookbook[isMobile ? lookbookIdx : (lookbookIdx + 1 < (collection.lookbook || []).length ? lookbookIdx + 1 : 0)]?.url || (collection.lookbook?.[0]?.url)} className="w-full aspect-lookbook object-cover" />
                             </div>
                         </div>
-                    )}
-
-                    {view === 'cart' && (
-                        <div className="min-h-screen p-6 max-w-4xl mx-auto animate-fade-in">
-                            <div className="flex justify-between items-center mb-12">
-                                <button onClick={() => setView('browse')} className="flex items-center gap-2 text-[10px] uppercase tracking-widest hover:text-gray-400 transition-colors"><ArrowLeft size={14} /> Back</button>
-                                <h2 className="text-xl font-light uppercase tracking-widest">Bag ({cart.length}/{limit})</h2>
-                                <div className="w-10"></div>
-                            </div>
-                            <div className="space-y-8 mb-20">
-                                {cart.map((item, i) => (
-                                    <div key={i} className="flex gap-6 border-b border-gray-100 pb-8 items-center">
-                                        <img src={item.product.images[0]} className="w-24 aspect-product object-cover bg-gray-50" />
-                                        <div className="flex-1"><h3 className="text-xs font-medium uppercase tracking-wider">{item.product.name}</h3><p className="text-[10px] text-gray-400 uppercase">Size: {item.size}</p></div>
-                                        <button onClick={() => setCart(cart.filter((_, idx)=>idx!==i))} className="text-gray-300 hover:text-black transition-colors"><X size={18} /></button>
-                                    </div>
-                                ))}
-                                {cart.length === 0 && <p className="text-center py-20 text-xs text-gray-400 uppercase tracking-widest">Bag is empty</p>}
-                            </div>
-                            {cart.length > 0 && (
-                                <div className="space-y-12 animate-fade-in">
-                                    <h3 className="text-xs font-bold uppercase tracking-widest border-b border-black pb-4">Delivery</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                        <InputField label="Instagram ID" required value={formData.instagramId} onChange={v => setFormData({...formData, instagramId: v})} />
-                                        <InputField label="Name" required value={formData.name} onChange={v => setFormData({...formData, name: v})} />
-                                        <InputField label="Phone" required value={formData.phone} onChange={v => setFormData({...formData, phone: v})} />
-                                        <InputField label="Address" required value={formData.address} onChange={v => setFormData({...formData, address: v})} />
-                                        <InputField label="Message" value={formData.message} onChange={v => setFormData({...formData, message: v})} />
-                                    </div>
-                                    <div className="space-y-6">
-                                        <label className="flex items-start gap-3 cursor-pointer group">
-                                            <input type="checkbox" checked={formData.agreed} onChange={e => setFormData({...formData, agreed: e.target.checked})} className="mt-1 accent-black"/>
-                                            <span className="text-[10px] text-gray-500 uppercase leading-relaxed font-light tracking-widest">*재고 상황 등에 따라 일부 내용이 달라질 수 있으며, 올려주신 콘텐츠는 브랜드 소개나 홍보에 활용될 수 있습니다.</span>
-                                        </label>
-                                        <button 
-                                            onClick={() => {
-                                                const orders = cart.map(item => ({
-                                                    id: Math.random().toString(36).substr(2, 9),
-                                                    status: 'Preparing', date: new Date().toLocaleDateString(),
-                                                    ...formData, productName: item.product.name, size: item.size
-                                                }));
-                                                onOrderSubmit(orders);
-                                                setView('success');
-                                            }} 
-                                            disabled={!formData.agreed || !formData.instagramId || !formData.name || !formData.phone || !formData.address}
-                                            className="w-full bg-black text-white py-6 text-xs tracking-[0.3em] font-medium disabled:bg-gray-100 uppercase"
-                                        >Submit Order</button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    )}
-
-                    {view === 'success' && (
-                        <div className="min-h-screen flex items-center justify-center text-center px-6">
-                            <div className="max-w-md space-y-8 animate-fade-in">
-                                <h2 className="text-xl font-light italic leading-relaxed">Thank you, nuuanu girl!<br/>We love having you as part of our journey ✨</h2>
-                                <button onClick={onLogout} className="px-12 py-4 border border-black text-[10px] uppercase tracking-[0.3em]">Exit</button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            );
-        };
-
-        const AdminDashboard = ({ collections, adminConfig, onUpdateAdminConfig, onUpdateCollection, onAddCollection, onLogout }) => {
-            const [activeColId, setActiveColId] = useState(null);
-            const [tab, setTab] = useState('Settings');
-            const [isCreating, setIsCreating] = useState(false);
-            const [newColName, setNewColName] = useState('');
-            const [msg, setMsg] = useState(null);
-
-            const activeCol = useMemo(() => collections.find(c => c.id === activeColId), [collections, activeColId]);
-            const showMsg = (text, type='success') => { setMsg({ text, type }); setTimeout(() => setMsg(null), 3000); };
-
-            if (!activeColId) return (
-                <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6 animate-fade-in">
-                    <div className="w-full max-w-xl bg-white shadow-sm p-12 space-y-12">
-                        <div className="flex justify-between items-center"><h1 className="text-xl font-light tracking-[0.2em] uppercase italic">nuuanu Admin</h1><button onClick={onLogout} className="text-gray-400 hover:text-black transition-colors"><LogOut size={18} /></button></div>
-                        <div className="space-y-4">
-                            <h2 className="text-xs font-bold uppercase tracking-[0.2em] border-b pb-4">Select Collection</h2>
-                            {collections.map(c => (
-                                <button key={c.id} onClick={() => setActiveColId(c.id)} className="w-full text-left p-6 border border-gray-100 hover:border-black transition-all flex justify-between items-center group">
-                                    <span className="text-sm font-medium uppercase tracking-widest">{c.name}</span>
-                                    <span className="text-[10px] text-gray-400 group-hover:text-black font-bold">{c.orders.length} ORDERS</span>
-                                </button>
-                            ))}
-                            {isCreating ? (
-                                <div className="p-6 border border-black space-y-4 animate-fade-in">
-                                    <input autoFocus type="text" placeholder="Collection Name (e.g. 25FW)" value={newColName} onChange={e=>setNewColName(e.target.value)} className="w-full border-b py-2 focus:outline-none uppercase text-sm tracking-widest"/>
-                                    <div className="flex gap-2"><button onClick={() => { onAddCollection({ id: Math.random().toString(36).substr(2,9), name: newColName, accessCodes: [], lookbook: [], products: [], orders: [], descriptionTitle: '', descriptionBody: '' }); setIsCreating(false); setNewColName(''); }} className="flex-1 bg-black text-white py-3 text-[10px] uppercase">Create</button><button onClick={()=>setIsCreating(false)} className="px-6 border py-3 text-[10px] uppercase">Cancel</button></div>
-                                </div>
-                            ) : (
-                                <button onClick={()=>setIsCreating(true)} className="w-full border border-dashed p-6 text-gray-400 hover:border-black hover:text-black transition-all flex items-center justify-center gap-2"><Plus size={16} /><span className="text-xs uppercase tracking-widest">Create New</span></button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            );
-
-            return (
-                <div className="min-h-screen bg-[#fafafa] flex">
-                    <aside className="w-64 bg-white border-r fixed inset-y-0 p-4 space-y-8 shadow-sm">
-                        <div className="p-4 text-center border-b"><h1 className="text-sm font-light italic uppercase tracking-[0.2em]">nuuanu</h1><span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Admin</span></div>
-                        <nav className="space-y-1">
-                            {[
-                                { id: 'Settings', icon: Settings, label: 'Settings' },
-                                { id: 'Products', icon: Package, label: 'Products' },
-                                { id: 'Shipping', icon: Truck, label: 'Shipping' },
-                                { id: 'Report', icon: BarChart3, label: 'Report' }
-                            ].map(item => (
-                                <button key={item.id} onClick={()=>setTab(item.id)} className={`w-full flex items-center gap-3 p-4 rounded-lg text-[10px] font-bold uppercase tracking-[0.15em] transition-all ${tab===item.id ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:bg-gray-50 hover:text-black'}`}>
-                                    <item.icon size={18} /> {item.label}
-                                </button>
-                            ))}
-                        </nav>
-                        <div className="absolute bottom-4 left-4 right-4 space-y-2">
-                            <button onClick={()=>setActiveColId(null)} className="w-full flex items-center gap-3 p-4 text-[10px] uppercase text-gray-400 hover:text-black tracking-widest"><ChevronDown size={14} className="rotate-90"/> Switch Col</button>
-                            <button onClick={onLogout} className="w-full flex items-center gap-3 p-4 text-[10px] uppercase text-red-400 hover:text-red-600 tracking-widest"><LogOut size={14}/> Logout</button>
-                        </div>
-                    </aside>
-                    <main className="flex-1 ml-64 p-12">
-                        <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
-                            <div className="flex justify-between items-end">
-                                <div><p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">{tab}</p><h2 className="text-2xl font-light uppercase tracking-[0.2em]">{activeCol.name}</h2></div>
-                                {msg && <div className={`px-6 py-2 rounded-full text-[10px] uppercase tracking-widest animate-fade-in ${msg.type==='success'?'bg-black text-white':'bg-red-500 text-white'}`}>{msg.text}</div>}
-                            </div>
-                            <div className="bg-white p-10 shadow-sm min-h-[600px] rounded-sm">
-                                {tab==='Settings' && <SettingsTab collection={activeCol} adminConfig={adminConfig} onUpdateAdminConfig={onUpdateAdminConfig} onUpdate={onUpdateCollection} showMsg={showMsg}/>}
-                                {tab==='Products' && <ProductsTab collection={activeCol} onUpdate={onUpdateCollection} showMsg={showMsg}/>}
-                                {tab==='Shipping' && <ShippingTab collection={activeCol} onUpdate={onUpdateCollection} showMsg={showMsg}/>}
-                                {tab==='Report' && <ReportTab collection={activeCol} />}
-                            </div>
-                        </div>
-                    </main>
-                </div>
-            );
-        };
-
-        const SettingsTab = ({ collection, adminConfig, onUpdateAdminConfig, onUpdate, showMsg }) => {
-            const [lc, setLc] = useState({...collection});
-            const [la, setLa] = useState({...adminConfig});
-            const handleSave = () => { onUpdate(lc); onUpdateAdminConfig(la); showMsg('Settings Saved'); };
-            return (
-                <div className="space-y-12 animate-fade-in">
-                    <section className="grid grid-cols-2 gap-10">
-                        <div className="space-y-4">
-                            <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-2">Security</h3>
-                            <InputField label="Admin Password" value={la.password} onChange={v => setLa({...la, password: v})} />
-                            <InputField label="Recovery Phrase" value={la.recoveryPhrase} onChange={v => setLa({...la, recoveryPhrase: v})} />
-                        </div>
-                        <div className="space-y-4">
-                            <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-2">Branding</h3>
-                            <div className="flex items-center gap-4">
-                                {lc.logoUrl && <img src={lc.logoUrl} className="h-10 border p-1" />}
-                                <label className="flex-1 border border-dashed border-gray-200 p-4 text-center cursor-pointer hover:border-black transition-all">
-                                    <Upload size={16} className="mx-auto mb-1 text-gray-400"/>
-                                    <span className="text-[10px] uppercase tracking-widest">Logo Upload</span>
-                                    <input type="file" className="hidden" onChange={e => { if(e.target.files[0]) setLc({...lc, logoUrl: URL.createObjectURL(e.target.files[0])}); }} />
-                                </label>
-                            </div>
-                        </div>
+                        <button onClick={() => setLookbookIdx((p:any) => Math.max(0, p - (isMobile ? 1 : 2)))} className="absolute left-6 top-1/2 -translate-y-1/2 text-white/90 hover:text-white transition-all"><ChevronLeft size={48}/></button>
+                        <button onClick={() => setLookbookIdx((p:any) => (p + (isMobile ? 1 : 2) >= (collection.lookbook || []).length ? 0 : p + (isMobile ? 1 : 2)))} className="absolute right-6 top-1/2 -translate-y-1/2 text-white/90 hover:text-white transition-all"><ChevronRight size={48}/></button>
                     </section>
-                    <section className="space-y-4">
-                        <div className="flex justify-between items-center"><h3 className="text-xs font-bold uppercase tracking-widest">Influencer Codes</h3><button onClick={()=>setLc({...lc, accessCodes:[...lc.accessCodes, {code:'', limit:1}]})} className="text-[10px] underline uppercase tracking-widest">Add Code</button></div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {lc.accessCodes.map((ac, i) => (
-                                <div key={i} className="flex gap-2 items-center border-b py-2">
-                                    <input type="text" placeholder="CODE" value={ac.code} onChange={e=>{ const c=[...lc.accessCodes]; c[i].code=e.target.value.toUpperCase(); setLc({...lc, accessCodes:c}); }} className="flex-1 focus:outline-none uppercase text-xs tracking-widest"/>
-                                    <input type="number" value={ac.limit} onChange={e=>{ const c=[...lc.accessCodes]; c[i].limit=parseInt(e.target.value); setLc({...lc, accessCodes:c}); }} className="w-12 text-center text-xs border-x border-gray-100"/>
-                                    <button onClick={()=>setLc({...lc, accessCodes: lc.accessCodes.filter((_, idx)=>idx!==i)})}><X size={14} className="text-gray-300 hover:text-black"/></button>
-                                </div>
-                            ))}
-                        </div>
+                    <section className="text-center px-6 py-20 max-w-2xl mx-auto">
+                        <h2 className="text-2xl font-light uppercase tracking-widest mb-6">{collection.descriptionTitle}</h2>
+                        <p className="text-sm text-gray-500 leading-relaxed font-light">{collection.descriptionBody}</p>
                     </section>
-                    <section className="space-y-6">
-                        <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-2">Lookbook Gallery</h3>
-                        <div className="flex flex-wrap gap-4">
-                            {lc.lookbook.map(lb => (
-                                <div key={lb.id} className="relative w-24 aspect-lookbook border group overflow-hidden bg-gray-50">
-                                    <img src={lb.url} className="w-full h-full object-cover"/>
-                                    <button onClick={()=>setLc({...lc, lookbook: lc.lookbook.filter(i=>i.id!==lb.id)})} className="absolute top-1 right-1 p-1 bg-white/80 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"><X size={10}/></button>
+                    <section className="px-4 grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-12">
+                        {(collection.products || []).map((p: any) => (
+                            <div key={p.id} onClick={() => handleProductClick(p)} className="group cursor-pointer">
+                                <div className="aspect-product overflow-hidden bg-gray-50 mb-4">
+                                    <img src={p.images[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
                                 </div>
-                            ))}
-                            <label className="w-24 aspect-lookbook border border-dashed border-gray-200 flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-black cursor-pointer transition-colors">
-                                <Plus size={24}/><span className="text-[10px] uppercase tracking-widest">Upload</span>
-                                <input type="file" multiple className="hidden" onChange={e => { const fs=Array.from(e.target.files).map(f=>({id:Math.random().toString(36).substr(2,9), url:URL.createObjectURL(f)})); setLc({...lc, lookbook: [...lc.lookbook, ...fs]}); }} />
-                            </label>
-                        </div>
-                    </section>
-                    <section className="space-y-4">
-                        <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-2">Intro Description</h3>
-                        <InputField label="Title" value={lc.descriptionTitle} onChange={v => setLc({...lc, descriptionTitle: v})} />
-                        <textarea value={lc.descriptionBody} onChange={e => setLc({...lc, descriptionBody: e.target.value})} placeholder="Body..." className="w-full border p-4 text-xs font-light focus:outline-none focus:border-black h-32 leading-relaxed"/>
-                    </section>
-                    <div className="flex justify-end pt-10"><button onClick={handleSave} className="bg-black text-white px-10 py-4 text-xs uppercase tracking-[0.2em] transition-colors hover:bg-zinc-800 flex items-center gap-2"><Save size={16}/> Save Settings</button></div>
-                </div>
-            );
-        };
-
-        const ProductsTab = ({ collection, onUpdate, showMsg }) => {
-            const [prods, setProds] = useState([...collection.products]);
-            const handleUpload = (e) => {
-                const f = e.target.files[0]; if(!f) return;
-                const r = new FileReader();
-                r.onload = (event) => {
-                    const rows = event.target.result.split('\n');
-                    const news = rows.map(r => {
-                        const parts = r.split(/[\t,]/);
-                        const name = parts[0]?.trim(); if(!name || name==='상품') return null;
-                        const opts = parts[2]?.match(/size\{(.*)\}/)?.[1]?.split('|') || [];
-                        return { id: Math.random().toString(36).substr(2,9), name, price: parseInt(parts[1])||0, options: opts, summary: parts[3]||'', images: [] };
-                    }).filter(Boolean);
-                    setProds([...prods, ...news]); showMsg(`${news.length} items added`);
-                };
-                r.readAsText(f);
-            };
-            return (
-                <div className="space-y-12 animate-fade-in">
-                    <section className="flex justify-between items-center border-b pb-6">
-                        <div><h3 className="text-xs font-bold uppercase tracking-widest">Bulk Import</h3><p className="text-[9px] text-gray-400 uppercase tracking-widest">Header: 상품, 판매가, 옵션(size{1|2}), 설명</p></div>
-                        <label className="bg-black text-white px-6 py-3 text-[10px] uppercase cursor-pointer flex items-center gap-2 tracking-widest"><FileText size={14}/> Upload File<input type="file" className="hidden" onChange={handleUpload}/></label>
-                    </section>
-                    <div className="space-y-4">
-                        {prods.map((p, i) => (
-                            <div key={p.id} className="flex gap-6 items-start p-6 bg-gray-50 border border-gray-100 group relative">
-                                <span className="text-[10px] text-gray-300 font-mono">{i+1}</span>
-                                <div className="flex-1 grid grid-cols-4 gap-6">
-                                    <div className="space-y-1"><p className="text-[9px] font-bold text-gray-400 uppercase">Product</p><p className="text-xs font-medium uppercase tracking-widest">{p.name}</p></div>
-                                    <div className="space-y-1 text-center"><p className="text-[9px] font-bold text-gray-400 uppercase">Price</p><p className="text-xs">₩{p.price.toLocaleString()}</p></div>
-                                    <div className="col-span-2 space-y-1"><p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Description</p><textarea value={p.summary} onChange={e=>{ const n=[...prods]; n[i].summary=e.target.value; setProds(n); }} className="w-full bg-white border border-gray-100 p-2 text-xs focus:outline-none h-16 resize-none no-scrollbar"/></div>
-                                </div>
-                                <div className="w-48 flex gap-2 flex-wrap justify-end">
-                                    {p.images.map((img, idx) => <div key={idx} className="relative w-12 aspect-product border border-gray-200 bg-white"><img src={img} className="w-full h-full object-cover"/><button onClick={()=>{const n=[...prods]; n[i].images=n[i].images.filter((_,j)=>j!==idx); setProds(n);}} className="absolute inset-0 bg-black/50 text-white flex items-center justify-center opacity-0 hover:opacity-100"><X size={10}/></button></div>)}
-                                    <label className="w-12 aspect-product border border-dashed border-gray-300 flex items-center justify-center text-gray-400 cursor-pointer bg-white transition-colors"><Plus size={14}/><input type="file" multiple className="hidden" onChange={e=>{ const fs=Array.from(e.target.files).map(f=>URL.createObjectURL(f)); const n=[...prods]; n[i].images=[...n[i].images, ...fs]; setProds(n); }}/></label>
-                                </div>
-                                <button onClick={()=>setProds(prods.filter(it=>it.id!==p.id))} className="absolute top-2 right-2 text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
+                                <h3 className="text-xs font-medium uppercase tracking-wider">{p.name || 'Untitled'}</h3>
+                                <p className="text-[10px] text-gray-400 uppercase tracking-widest">₩{(p.price || 0).toLocaleString()}</p>
                             </div>
                         ))}
-                    </div>
-                    <div className="flex justify-end pt-10"><button onClick={()=>onUpdate({...collection, products: prods})} className="bg-black text-white px-10 py-4 text-xs uppercase flex items-center gap-2 transition-colors hover:bg-zinc-800"><Save size={16}/> Save Catalog</button></div>
-                </div>
-            );
-        };
+                    </section>
+                </main>
+            )}
 
-        const ShippingTab = ({ collection, onUpdate, showMsg }) => {
-            const [orders, setOrders] = useState([...collection.orders]);
-            const [sel, setSel] = useState(new Set());
-            const [sort, setSort] = useState({ key: 'date', dir: 'desc' });
-
-            const sorted = useMemo(() => {
-                return [...orders].sort((a,b) => {
-                    const av=String(a[sort.key]||''), bv=String(b[sort.key]||'');
-                    return sort.dir==='asc' ? av.localeCompare(bv) : bv.localeCompare(av);
-                });
-            }, [orders, sort]);
-
-            const updateOrder = (id, field, value) => {
-                const ex = (field==='status' && value==='Shipped') ? { shippedDate: new Date().toLocaleDateString() } : {};
-                setOrders(orders.map(o => o.id===id ? {...o, [field]:value, ...ex} : o));
-            };
-
-            const toggleSel = (id) => {
-                const next = new Set(sel);
-                if(next.has(id)) next.delete(id); else next.add(id);
-                setSel(next);
-            };
-
-            return (
-                <div className="space-y-8 animate-fade-in">
-                    <div className="flex justify-between items-center">
-                        <div className="flex gap-2">
-                            <select onChange={e=>{ const n=orders.map(o=>sel.has(o.id)?{...o, status:e.target.value, shippedDate:e.target.value==='Shipped'?new Date().toLocaleDateString():undefined}:o); setOrders(n); setSel(new Set()); showMsg('Status Updated'); }} className="text-[10px] uppercase border p-2 focus:outline-none tracking-widest" value="">
-                                <option value="" disabled>Status Action</option><option value="Preparing">Preparing</option><option value="Shipped">Shipped</option>
-                            </select>
-                            <button onClick={()=>{ const csv="Instagram,Name,Phone,Address,Product,Size,Date\n"+orders.map(o=>`${o.instagramId},${o.name},${o.phone},"${o.address}",${o.productName},${o.size},${o.date}`).join('\n'); const b=new Blob(["\ufeff"+csv],{type:'text/csv'}); const u=URL.createObjectURL(b); const l=document.createElement('a'); l.href=u; l.download='shipping.csv'; l.click(); }} className="flex items-center gap-2 border px-4 py-2 text-[10px] uppercase hover:bg-black hover:text-white transition-all tracking-widest"><Download size={14}/> Export CSV</button>
+            {view === 'detail' && selectedProduct && (
+                <div className="fixed inset-0 z-[60] bg-white overflow-y-auto animate-fade-in">
+                    <button onClick={handleBackToBrowse} className="fixed top-6 right-6 p-2 z-[70] bg-white/50 rounded-full hover:bg-white transition-all"><X size={24}/></button>
+                    <div className="flex flex-col md:flex-row min-h-screen">
+                        <div className="w-full md:w-1/2 space-y-4 p-4">
+                            {(selectedProduct.images || []).map((img: any, i: number) => <img key={i} src={img} className="w-full aspect-product object-cover" />)}
                         </div>
-                        <button onClick={()=>onUpdate({...collection, orders})} className="bg-black text-white px-8 py-3 text-[10px] uppercase flex items-center gap-2 transition-colors hover:bg-zinc-800 tracking-widest"><Save size={14}/> Save Database</button>
-                    </div>
-                    <div className="overflow-x-auto border rounded-sm shadow-sm bg-white">
-                        <table className="w-full text-[10px] uppercase tracking-wider text-left border-collapse table-fixed min-w-[1200px]">
-                            <thead>
-                                <tr className="bg-gray-50 border-b border-gray-100">
-                                    <th className="p-3 w-10 text-center"><input type="checkbox" onChange={e=>setSel(e.target.checked?new Set(orders.map(o=>o.id)):new Set())}/></th>
-                                    {['Status','Date','Instagram','Name'].map(l=>(
-                                        <th key={l} onClick={()=>setSort({key:l.toLowerCase().replace(' ','Id'), dir:sort.dir==='asc'?'desc':'asc'})} className="p-3 font-bold text-gray-400 cursor-pointer hover:text-black transition-colors">
-                                            <div className="flex items-center gap-1">{l}<ArrowUpDown size={10}/></div>
-                                        </th>
-                                    ))}
-                                    <th className="p-3 text-gray-400 w-[60px]">Contact</th>
-                                    <th className="p-3 text-gray-400 w-[100px]">Address</th>
-                                    <th className="p-3 text-gray-400 w-[120px]">Item</th>
-                                    <th className="p-3 text-gray-400 w-[50px] text-center">Size</th>
-                                    <th className="p-3 text-gray-400 w-[300px]">Admin Memo</th>
-                                    <th className="p-3 w-32"></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {sorted.map(o=>(
-                                    <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50 group">
-                                        <td className="p-3 text-center"><input type="checkbox" checked={sel.has(o.id)} onChange={()=>toggleSel(o.id)}/></td>
-                                        <td className="p-3"><select value={o.status} onChange={e=>updateOrder(o.id,'status',e.target.value)} className={`bg-transparent font-bold focus:outline-none ${o.status==='Shipped'?'text-green-600':'text-orange-400'}`}><option value="Preparing">Preparing</option><option value="Shipped">Shipped</option></select></td>
-                                        <td className="p-3 text-gray-400">{o.status==='Shipped'?o.shippedDate:o.date}</td>
-                                        <td className="p-3 font-medium">{o.instagramId}</td>
-                                        <td className="p-3">{o.name}</td>
-                                        <td className="p-3 text-gray-400 truncate" title={o.phone}>{o.phone?.slice(0,3)}...</td>
-                                        <td className="p-3 text-gray-400 truncate" title={o.address}>{o.address?.slice(0,10)}...</td>
-                                        <td className="p-3"><input type="text" value={o.productName || ''} onChange={e=>updateOrder(o.id,'productName',e.target.value)} className="w-full bg-transparent focus:bg-gray-50 border-b border-transparent focus:border-gray-100 p-1"/></td>
-                                        <td className="p-3"><input type="text" value={o.size || ''} onChange={e=>updateOrder(o.id,'size',e.target.value)} className="w-full bg-transparent text-center focus:bg-gray-50 border-b border-transparent focus:border-gray-100 p-1"/></td>
-                                        <td className="p-3"><textarea value={o.adminMemo||''} onChange={e=>updateOrder(o.id,'adminMemo',e.target.value)} placeholder="..." className="w-full h-8 bg-transparent focus:bg-gray-50 border border-transparent focus:border-gray-100 resize-none no-scrollbar p-1 rounded-sm"/></td>
-                                        <td className="p-3 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            <button onClick={()=>{ const copy={...o,id:Math.random().toString(36).substr(2,9),date:'추가 제품',productName:'',size:''}; setOrders([copy,...orders]); showMsg('Copied'); }} className="text-gray-400 hover:text-black transition-colors"><Copy size={14}/></button>
-                                            <button onClick={()=>setOrders(orders.filter(it=>it.id!==o.id))} className="text-gray-200 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            );
-        };
-
-        const ReportTab = ({ collection }) => {
-            const COLORS = ['#6366f1', '#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6'];
-            const stats = useMemo(() => {
-                const p = {}; collection.orders.forEach(o=>{ p[o.productName]=(p[o.productName]||0)+1; });
-                return Object.entries(p).map(([name, value])=>({ 
-                    name: name || 'N/A', 
-                    value, 
-                    pct: ((value/(collection.orders.length || 1))*100).toFixed(1) 
-                })).sort((a,b)=>b.value-a.value);
-            }, [collection]);
-
-            return (
-                <div className="space-y-16 animate-fade-in py-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                        <div className="space-y-8">
-                            <h3 className="text-[10px] font-bold uppercase tracking-widest border-b border-gray-100 pb-2">Seeding Reach</h3>
-                            <div className="h-[340px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={stats}>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
-                                        <XAxis dataKey="name" tick={{fontSize:8, fill:'#94a3b8'}} axisLine={false} tickLine={false}/>
-                                        <YAxis tick={{fontSize:8, fill:'#94a3b8'}} axisLine={false} tickLine={false}/>
-                                        <Tooltip cursor={{fill:'#f8fafc'}} contentStyle={{fontSize: '10px', textTransform: 'uppercase'}}/>
-                                        <Bar dataKey="value" radius={[2, 2, 0, 0]}>
-                                            {stats.map((_, i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}
-                                        </Bar>
-                                    </BarChart>
-                                </ResponsiveContainer>
+                        <div className="w-full md:w-1/2 p-10 md:sticky md:top-0 md:h-screen flex flex-col justify-center">
+                            <div className="max-w-md mx-auto w-full space-y-8">
+                                <h2 className="text-2xl font-light uppercase tracking-widest">{selectedProduct.name}</h2>
+                                <div className="text-sm text-gray-600 leading-relaxed font-light" dangerouslySetInnerHTML={{ __html: selectedProduct.summary || '' }} />
+                                <div className="space-y-4">
+                                    <p className="text-[10px] uppercase tracking-widest font-bold">Select Size</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {(selectedProduct.options || []).map((opt: string) => (
+                                            <button key={opt} onClick={() => setTempSize(opt)} className={`px-6 py-3 border text-xs tracking-widest uppercase transition-colors ${tempSize === opt ? 'border-black bg-black text-white' : 'border-gray-200 hover:border-black'}`}>{opt}</button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <button onClick={handleConfirmAddToCart} disabled={!tempSize} className="w-full bg-black text-white py-5 text-xs tracking-[0.3em] font-medium disabled:bg-gray-100 uppercase transition-all">Add to Bag</button>
                             </div>
                         </div>
-                        <div className="flex flex-col justify-center items-center text-center space-y-10">
-                            <div className="p-12 border-[10px] border-black inline-block rounded-sm animate-fade-in"><p className="text-[10px] uppercase tracking-[0.4em] text-gray-400 mb-4 font-bold">Total Distributions</p><p className="text-8xl font-light italic">{collection.orders.length}</p></div>
-                            <div className="space-y-4 w-full max-w-xs">{stats.slice(0, 5).map((s,i)=><div key={i} className="flex justify-between text-[10px] uppercase tracking-widest font-bold"><span className="text-gray-400">{s.name}</span><span>{s.pct}%</span></div>)}</div>
-                        </div>
                     </div>
                 </div>
-            );
+            )}
+
+            {view === 'cart' && (
+                <div className="min-h-screen p-6 max-w-4xl mx-auto animate-fade-in">
+                    <div className="flex justify-between items-center mb-12">
+                        <button onClick={handleBackToBrowse} className="flex items-center gap-2 text-[10px] uppercase tracking-widest hover:text-gray-400 transition-colors"><ArrowLeft size={14} /> Back</button>
+                        <h2 className="text-xl font-light uppercase tracking-widest">Bag ({cart.length}/{limit})</h2>
+                        <div className="w-10"></div>
+                    </div>
+                    <div className="space-y-8 mb-20">
+                        {cart.map((item, i) => (
+                            <div key={i} className="flex gap-6 border-b border-gray-100 pb-8 items-center">
+                                <img src={item.product.images[0]} className="w-24 aspect-product object-cover bg-gray-50" />
+                                <div className="flex-1 font-light uppercase tracking-widest"><h3 className="text-xs font-medium">{item.product.name}</h3><p className="text-[10px] text-gray-400">Size: {item.size}</p></div>
+                                <button onClick={() => setCart(cart.filter((_, idx)=>idx!==i))} className="text-gray-300 hover:text-black transition-colors"><X size={18}/></button>
+                            </div>
+                        ))}
+                        {cart.length === 0 && <p className="text-center py-20 text-xs text-gray-400 uppercase tracking-widest">Bag is empty</p>}
+                    </div>
+                    {cart.length > 0 && (
+                        <div className="space-y-12 animate-fade-in">
+                            <h3 className="text-xs font-bold uppercase tracking-widest border-b border-black pb-4">Delivery Information</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <InputField label="Instagram ID" required value={formData.instagramId} onChange={(v:any) => setFormData({...formData, instagramId: v})} />
+                                <InputField label="Full Name" required value={formData.name} onChange={(v:any) => setFormData({...formData, name: v})} />
+                                <InputField label="Phone Number" required value={formData.phone} onChange={(v:any) => setFormData({...formData, phone: v})} />
+                                <InputField label="Shipping Address" required value={formData.address} onChange={(v:any) => setFormData({...formData, address: v})} />
+                                <InputField label="Delivery Message" value={formData.message} onChange={(v:any) => setFormData({...formData, message: v})} />
+                            </div>
+                            <div className="space-y-6">
+                                <label className="flex items-start gap-3 cursor-pointer group">
+                                    <input type="checkbox" checked={formData.agreed} onChange={e => setFormData({...formData, agreed: e.target.checked})} className="mt-1 accent-black"/>
+                                    <span className="text-[10px] text-gray-500 uppercase leading-relaxed font-light tracking-widest">*재고 상황 등에 따라 일부 내용이 달라질 수 있으며, 올려주신 콘텐츠는 브랜드 소개나 홍보에 활용될 수 있습니다.</span>
+                                </label>
+                                <button 
+                                    onClick={() => {
+                                        const orders = cart.map(item => ({
+                                            id: Math.random().toString(36).substr(2, 9),
+                                            status: 'Preparing', date: new Date().toLocaleDateString(),
+                                            ...formData, productName: item.product.name, size: item.size
+                                        }));
+                                        onOrderSubmit(orders);
+                                        setView('success');
+                                    }} 
+                                    disabled={!formData.agreed || !formData.instagramId || !formData.name || !formData.phone || !formData.address}
+                                    className="w-full bg-black text-white py-6 text-xs tracking-[0.3em] font-medium disabled:bg-gray-100 uppercase transition-all"
+                                >Submit Order</button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {view === 'success' && (
+                <div className="min-h-screen flex items-center justify-center text-center px-6">
+                    <div className="max-w-md space-y-8 animate-fade-in">
+                        <h2 className="text-xl font-light italic leading-relaxed">Thank you, nuuanu girl!<br/>We love having you as part of our journey ✨</h2>
+                        <button onClick={onLogout} className="px-12 py-4 border border-black text-[10px] uppercase tracking-[0.3em] hover:bg-black hover:text-white transition-all">Exit</button>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// --- Admin Section ---
+const AdminDashboard = ({ collections, adminConfig, onUpdateAdminConfig, onUpdateCollection, onAddCollection, onLogout }: any) => {
+    const [activeColId, setActiveColId] = useState<string | null>(null);
+    const [tab, setTab] = useState('Settings');
+    const [isCreating, setIsCreating] = useState(false);
+    const [newColName, setNewColName] = useState('');
+    const [msg, setMsg] = useState<any>(null);
+
+    const activeCol = useMemo(() => collections.find((c:any) => c.id === activeColId), [collections, activeColId]);
+    const showMsg = (text: any, type='success') => { setMsg({ text, type }); setTimeout(() => setMsg(null), 3000); };
+
+    if (!activeColId) return (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6 animate-fade-in">
+            <div className="w-full max-w-xl bg-white shadow-sm p-12 space-y-12">
+                <div className="flex justify-between items-center"><h1 className="text-xl font-light tracking-[0.2em] uppercase italic">nuuanu Admin</h1><button onClick={onLogout} className="text-gray-400 hover:text-black transition-colors"><LogOut size={18} /></button></div>
+                <div className="space-y-4">
+                    <h2 className="text-xs font-bold uppercase tracking-[0.2em] border-b pb-4">Select Collection</h2>
+                    {collections.map((c:any) => (
+                        <button key={c.id} onClick={() => setActiveColId(c.id)} className="w-full text-left p-6 border border-gray-100 hover:border-black transition-all flex justify-between items-center group">
+                            <span className="text-sm font-medium uppercase tracking-widest">{c.name}</span>
+                            <span className="text-[10px] text-gray-400 group-hover:text-black font-bold">{(c.orders || []).length} ORDERS</span>
+                        </button>
+                    ))}
+                    {isCreating ? (
+                        <div className="p-6 border border-black space-y-4 animate-fade-in">
+                            <input autoFocus type="text" placeholder="Collection Name (e.g. 25SS)" value={newColName} onChange={e=>setNewColName(e.target.value)} className="w-full border-b py-2 focus:outline-none uppercase text-sm tracking-widest"/>
+                            <div className="flex gap-2">
+                                <button onClick={() => { onAddCollection({ id: Math.random().toString(36).substr(2,9), name: newColName, accessCodes: [], lookbook: [], products: [], orders: [], descriptionTitle: '', descriptionBody: '' }); setIsCreating(false); setNewColName(''); }} className="flex-1 bg-black text-white py-3 text-[10px] uppercase tracking-widest">Create</button>
+                                <button onClick={()=>setIsCreating(false)} className="px-6 border py-3 text-[10px] uppercase tracking-widest">Cancel</button>
+                            </div>
+                        </div>
+                    ) : (
+                        <button onClick={()=>setIsCreating(true)} className="w-full border border-dashed p-6 text-gray-400 hover:border-black hover:border-black transition-all flex items-center justify-center gap-2"><Plus size={16} /><span className="text-xs uppercase tracking-widest">Create New</span></button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+
+    return (
+        <div className="min-h-screen bg-[#fafafa] flex">
+            <aside className="w-64 bg-white border-r fixed inset-y-0 p-4 space-y-8 shadow-sm">
+                <div className="p-4 text-center border-b"><h1 className="text-sm font-light italic uppercase tracking-[0.2em]">nuuanu</h1><span className="text-[10px] uppercase tracking-widest text-gray-400 font-bold">Manager</span></div>
+                <nav className="space-y-1">
+                    {[
+                        { id: 'Settings', icon: <Settings size={18}/>, label: 'Settings' },
+                        { id: 'Products', icon: <Package size={18}/>, label: 'Products' },
+                        { id: 'Shipping', icon: <Truck size={18}/>, label: 'Shipping' },
+                        { id: 'Report', icon: <BarChart3 size={18}/>, label: 'Report' }
+                    ].map(item => (
+                        <button key={item.id} onClick={()=>setTab(item.id)} className={`w-full flex items-center gap-3 p-4 rounded-lg text-[10px] font-bold uppercase tracking-[0.15em] transition-all ${tab===item.id ? 'bg-black text-white shadow-md' : 'text-gray-400 hover:bg-gray-50 hover:text-black'}`}>
+                            {item.icon} {item.label}
+                        </button>
+                    ))}
+                </nav>
+                <div className="absolute bottom-4 left-4 right-4 space-y-2">
+                    <button onClick={()=>setActiveColId(null)} className="w-full flex items-center gap-3 p-4 text-[10px] uppercase text-gray-400 hover:text-black tracking-widest"><ChevronDown size={14} className="rotate-90"/> Switch Col</button>
+                    <button onClick={onLogout} className="w-full flex items-center gap-3 p-4 text-[10px] uppercase text-red-400 hover:text-red-600 tracking-widest"><LogOut size={14}/> Logout</button>
+                </div>
+            </aside>
+            <main className="flex-1 ml-64 p-12">
+                <div className="max-w-6xl mx-auto space-y-8 animate-fade-in">
+                    <div className="flex justify-between items-end">
+                        <div><p className="text-[10px] uppercase tracking-widest text-gray-400 mb-1">{tab}</p><h2 className="text-2xl font-light uppercase tracking-[0.2em]">{activeCol.name}</h2></div>
+                        {msg && <div className={`px-6 py-2 rounded-full text-[10px] uppercase tracking-widest animate-fade-in ${msg.type==='success'?'bg-black text-white':'bg-red-500 text-white'}`}>{msg.text}</div>}
+                    </div>
+                    <div className="bg-white p-10 shadow-sm min-h-[600px] rounded-sm">
+                        {tab==='Settings' && <SettingsTab collection={activeCol} adminConfig={adminConfig} onUpdateAdminConfig={onUpdateAdminConfig} onUpdate={onUpdateCollection} showMsg={showMsg}/>}
+                        {tab==='Products' && <ProductsTab collection={activeCol} onUpdate={onUpdateCollection} showMsg={showMsg}/>}
+                        {tab==='Shipping' && <ShippingTab collection={activeCol} onUpdate={onUpdateCollection} showMsg={showMsg}/>}
+                        {tab==='Report' && <ReportTab collection={activeCol} />}
+                    </div>
+                </div>
+            </main>
+            <StorageMonitor />
+        </div>
+    );
+};
+
+const SettingsTab = ({ collection, adminConfig, onUpdateAdminConfig, onUpdate, showMsg }: any) => {
+    const [lc, setLc] = useState({...collection});
+    const [la, setLa] = useState({...adminConfig});
+    
+    const handleSave = async () => { 
+        return onUpdate(lc, la);
+    };
+
+    const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files?.[0]) {
+            const compressed = await compressImage(e.target.files[0]);
+            setLc({...lc, logoUrl: compressed});
+        }
+    };
+
+    const handleLookbookUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const files = Array.from(e.target.files);
+            const compressedResults = await Promise.all(files.map(f => compressImage(f)));
+            const newItems = compressedResults.map(url => ({
+                id: Math.random().toString(36).substr(2, 9),
+                url
+            }));
+            setLc({...lc, lookbook: [...(lc.lookbook || []), ...newItems]});
+        }
+    };
+
+    return (
+        <div className="space-y-12 animate-fade-in">
+            <section className="grid grid-cols-2 gap-10">
+                <div className="space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-2">Security</h3>
+                    <InputField label="Admin Password" value={la.password} onChange={(v:any) => setLa({...la, password: v})} />
+                    <InputField label="Recovery Phrase" value={la.recoveryPhrase} onChange={(v:any) => setLa({...la, recoveryPhrase: v})} />
+                </div>
+                <div className="space-y-4">
+                    <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-2">Branding</h3>
+                    <div className="flex items-center gap-4">
+                        {lc.logoUrl && <img src={lc.logoUrl} className="h-10 border p-1" />}
+                        <label className="flex-1 border border-dashed border-gray-200 p-4 text-center cursor-pointer hover:border-black transition-all">
+                            <Upload size={16} className="mx-auto mb-1 text-gray-400"/>
+                            <span className="text-[10px] uppercase tracking-widest">Logo Upload</span>
+                            <input type="file" className="hidden" onChange={handleLogoUpload} />
+                        </label>
+                    </div>
+                </div>
+            </section>
+            <section className="space-y-4">
+                <div className="flex justify-between items-center"><h3 className="text-xs font-bold uppercase tracking-widest">Access Codes</h3><button onClick={()=>setLc({...lc, accessCodes:[...(lc.accessCodes||[]), {code:'', limit:1}]})} className="text-[10px] underline uppercase tracking-widest">Add Code</button></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {(lc.accessCodes || []).map((ac:any, i:number) => (
+                        <div key={i} className="flex gap-2 items-center border-b py-2">
+                            <input type="text" placeholder="CODE" value={ac.code} onChange={e=>{ const c=[...lc.accessCodes]; c[i].code=e.target.value.toUpperCase(); setLc({...lc, accessCodes:c}); }} className="flex-1 focus:outline-none uppercase text-xs tracking-[0.1em]"/>
+                            <input type="number" value={ac.limit} onChange={e=>{ const c=[...lc.accessCodes]; c[i].limit=parseInt(e.target.value); setLc({...lc, accessCodes:c}); }} className="w-12 text-center text-xs border-x border-gray-100"/>
+                            <button onClick={()=>setLc({...lc, accessCodes: lc.accessCodes.filter((_:any, idx:any)=>idx!==i)})}><X size={14} className="text-gray-300 hover:text-black"/></button>
+                        </div>
+                    ))}
+                </div>
+            </section>
+            <section className="space-y-6">
+                <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-2">Lookbook Gallery</h3>
+                <div className="flex flex-wrap gap-4">
+                    {(lc.lookbook || []).map((lb:any) => (
+                        <div key={lb.id} className="relative w-24 aspect-lookbook border group overflow-hidden bg-gray-50">
+                            <img src={lb.url} className="w-full h-full object-cover"/>
+                            <button onClick={()=>setLc({...lc, lookbook: lc.lookbook.filter((i:any)=>i.id!==lb.id)})} className="absolute top-1 right-1 p-1 bg-white/80 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity"><X size={10}/></button>
+                        </div>
+                    ))}
+                    <label className="w-24 aspect-lookbook border border-dashed border-gray-200 flex flex-col items-center justify-center gap-2 text-gray-400 hover:text-black cursor-pointer transition-colors">
+                        <Plus size={24}/><span className="text-[10px] uppercase tracking-widest">Upload</span>
+                        <input type="file" multiple className="hidden" onChange={handleLookbookUpload} />
+                    </label>
+                </div>
+            </section>
+            <section className="space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-widest border-b pb-2">Intro Description</h3>
+                <InputField label="Title" value={lc.descriptionTitle} onChange={(v:any) => setLc({...lc, descriptionTitle: v})} />
+                <textarea value={lc.descriptionBody} onChange={e => setLc({...lc, descriptionBody: e.target.value})} placeholder="Describe the mood of the collection..." className="w-full border p-4 text-xs font-light focus:outline-none focus:border-black h-32 leading-relaxed"/>
+            </section>
+            <div className="flex justify-end pt-10"><AnimatedSaveButton onSave={handleSave}/></div>
+        </div>
+    );
+};
+
+const ProductsTab = ({ collection, onUpdate, showMsg }: any) => {
+    const [prods, setProds] = useState([...(collection.products || [])]);
+    
+    const handleExcelUpload = (e:any) => {
+        const f = e.target.files?.[0]; if(!f) return;
+        const r = new FileReader();
+        r.onload = (event:any) => {
+            const rows = event.target.result.split('\n');
+            const news = rows.map((r:any) => {
+                const parts = r.split(/[\t,]/);
+                const name = parts[0]?.trim(); if(!name || name==='상품') return null;
+                const opts = parts[2]?.match(/size\{(.*)\}/)?.[1]?.split('|') || [];
+                return { id: Math.random().toString(36).substr(2,9), name, price: parseInt(parts[1])||0, options: opts, summary: parts[3]||'', images: [] };
+            }).filter(Boolean);
+            setProds([...prods, ...news]); showMsg(`${news.length} items added`);
         };
+        r.readAsText(f);
+    };
 
-        // --- Main App ---
-        const App = () => {
-            const [collections, setCollections] = useState(() => {
-                const saved = localStorage.getItem('nuuanu_collections_v3');
-                return saved ? JSON.parse(saved) : INITIAL_COLLECTIONS;
-            });
-            const [adminConfig, setAdminConfig] = useState(() => {
-                const saved = localStorage.getItem('nuuanu_admin_v3');
-                return saved ? JSON.parse(saved) : { password: 'ADMIN', recoveryPhrase: 'nuuanu' };
-            });
-            const [session, setSession] = useState(null);
+    const handleProductImageUpload = async (id: string, e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files) {
+            const files = Array.from(e.target.files);
+            const compressedResults = await Promise.all(files.map(f => compressImage(f)));
+            setProds(prods.map(p => p.id === id ? { ...p, images: [...(p.images || []), ...compressedResults] } : p));
+        }
+    };
 
-            useEffect(() => { localStorage.setItem('nuuanu_collections_v3', JSON.stringify(collections)); }, [collections]);
-            useEffect(() => { localStorage.setItem('nuuanu_admin_v3', JSON.stringify(adminConfig)); }, [adminConfig]);
+    const handleSave = async () => {
+        return onUpdate({...collection, products: prods});
+    };
 
-            const handleLogin = (code) => {
-                const input = code.trim().toUpperCase();
-                if (input === adminConfig.password.toUpperCase()) { setSession({ role: 'admin' }); return true; }
-                for (const col of collections) {
-                    const match = col.accessCodes.find(c => c.code.toUpperCase() === input);
-                    if (match) { setSession({ role: 'influencer', collectionId: col.id, limit: match.limit }); return true; }
-                }
-                return false;
-            };
+    return (
+        <div className="space-y-12 animate-fade-in">
+            <section className="flex justify-between items-center border-b pb-6">
+                <div><h3 className="text-xs font-bold uppercase tracking-widest">Bulk Import</h3><p className="text-[9px] text-gray-400 uppercase tracking-widest">Excel Headers: 상품, 판매가, 옵션(size{1|2}), 설명</p></div>
+                <label className="bg-black text-white px-6 py-3 text-[10px] uppercase cursor-pointer flex items-center gap-2 tracking-widest"><FileText size={14}/> Upload File<input type="file" className="hidden" onChange={handleExcelUpload}/></label>
+            </section>
+            <div className="space-y-4">
+                {prods.map((p:any, i:number) => (
+                    <div key={p.id} className="flex gap-6 items-start p-6 bg-gray-50 border border-gray-100 group relative">
+                        <span className="text-[10px] text-gray-300 font-mono">{i+1}</span>
+                        <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-6">
+                            <div className="space-y-1"><p className="text-[9px] font-bold text-gray-400 uppercase">Product</p><p className="text-xs font-medium uppercase tracking-widest">{p.name}</p></div>
+                            <div className="space-y-1 text-center"><p className="text-[9px] font-bold text-gray-400 uppercase">Price</p><p className="text-xs">₩{(p.price || 0).toLocaleString()}</p></div>
+                            <div className="col-span-2 space-y-1"><p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Description</p><textarea value={p.summary} onChange={e=>{ const n=[...prods]; n[i].summary=e.target.value; setProds(n); }} className="w-full bg-white border border-gray-100 p-2 text-xs focus:outline-none h-16 resize-none no-scrollbar"/></div>
+                        </div>
+                        <div className="w-48 flex gap-2 flex-wrap justify-end">
+                            {(p.images || []).map((img:any, idx:number) => <div key={idx} className="relative w-12 aspect-product border border-gray-200 bg-white"><img src={img} className="w-full h-full object-cover"/><button onClick={()=>{const n=[...prods]; n[i].images=n[i].images.filter((_:any,j:any)=>j!==idx); setProds(n);}} className="absolute inset-0 bg-black/40 text-white flex items-center justify-center opacity-0 hover:opacity-100"><X size={10}/></button></div>)}
+                            <label className="w-12 aspect-product border border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:text-black cursor-pointer bg-white transition-colors"><Plus size={14}/><input type="file" multiple className="hidden" onChange={(e) => handleProductImageUpload(p.id, e)}/></label>
+                        </div>
+                        <button onClick={()=>setProds(prods.filter((it:any)=>it.id!==p.id))} className="absolute top-2 right-2 text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
+                    </div>
+                ))}
+            </div>
+            <div className="flex justify-end pt-10"><AnimatedSaveButton onSave={handleSave} label="Save Product List"/></div>
+        </div>
+    );
+};
 
-            const handleReset = (phrase) => {
-                if (phrase.trim().toLowerCase() === adminConfig.recoveryPhrase.toLowerCase()) {
-                    setAdminConfig(prev => ({ ...prev, password: 'ADMIN' })); return true;
-                }
-                return false;
-            };
+const ShippingTab = ({ collection, onUpdate, showMsg }: any) => {
+    const [orders, setOrders] = useState([...(collection.orders || [])]);
+    const [sel, setSel] = useState<Set<string>>(new Set());
+    const [sort, setSort] = useState({ key: 'date', dir: 'desc' });
 
-            if (!session) return <LoginPage onLogin={handleLogin} onReset={handleReset} />;
+    const sorted = useMemo(() => {
+        return [...orders].sort((a:any,b:any) => {
+            const av=String(a[sort.key]||''), bv=String(b[sort.key]||'');
+            return sort.dir==='asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+        });
+    }, [orders, sort]);
 
-            if (session.role === 'admin') return (
-                <AdminDashboard 
-                    collections={collections}
-                    adminConfig={adminConfig}
-                    onUpdateAdminConfig={setAdminConfig}
-                    onUpdateCollection={updated => setCollections(collections.map(c => c.id === updated.id ? updated : c))}
-                    onAddCollection={newCol => setCollections([...collections, newCol])}
-                    onLogout={() => setSession(null)}
-                />
-            );
+    const updateOrder = (id: string, field: string, value: any) => {
+        const ex = (field==='status' && value==='Shipped') ? { shippedDate: new Date().toLocaleDateString() } : {};
+        setOrders(orders.map(o => o.id===id ? {...o, [field]:value, ...ex} : o));
+    };
 
-            const activeCol = collections.find(c => c.id === session.collectionId);
-            if (!activeCol) return null;
+    const toggleSelection = (id: string) => {
+        const next = new Set(sel); 
+        if(next.has(id)) next.delete(id); 
+        else next.add(id); 
+        setSel(next);
+    };
 
-            return (
-                <InfluencerPage 
-                    collection={activeCol}
-                    limit={session.limit}
-                    onLogout={() => setSession(null)}
-                    onOrderSubmit={newOrders => {
-                        const updated = { ...activeCol, orders: [...activeCol.orders, ...newOrders] };
-                        setCollections(collections.map(c => c.id === updated.id ? updated : c));
-                    }}
-                />
-            );
-        };
+    const handleSave = async () => {
+        return onUpdate({...collection, orders});
+    };
 
-        const root = createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
-</body>
-</html>
+    return (
+        <div className="space-y-8 animate-fade-in">
+            <div className="flex justify-between items-center">
+                <div className="flex gap-2">
+                    <select onChange={e=>{ const n=orders.map(o=>sel.has(o.id)?{...o, status:e.target.value as any, shippedDate:e.target.value==='Shipped'?new Date().toLocaleDateString():undefined}:o); setOrders(n); setSel(new Set()); showMsg('Status Updated'); }} className="text-[10px] uppercase border p-2 focus:outline-none tracking-widest" value="">
+                        <option value="" disabled>Status Action</option><option value="Preparing">Preparing</option><option value="Shipped">Shipped</option>
+                    </select>
+                    <button onClick={()=>{ const csv="Instagram,Name,Phone,Address,Product,Size,Date\n"+orders.map(o=>`${o.instagramId},${o.name},${o.phone},"${o.address}",${o.productName},${o.size},${o.date}`).join('\n'); const b=new Blob(["\ufeff"+csv],{type:'text/csv'}); const u=URL.createObjectURL(b); const l=document.createElement('a'); l.href=u; l.download='nuuanu_orders.csv'; l.click(); }} className="flex items-center gap-2 border px-4 py-2 text-[10px] uppercase hover:bg-black hover:text-white transition-all tracking-widest"><Download size={14}/> Export CSV</button>
+                </div>
+                <AnimatedSaveButton onSave={handleSave} label="Save Database" />
+            </div>
+            <div className="overflow-x-auto border rounded-sm shadow-sm bg-white">
+                <table className="w-full text-[10px] uppercase tracking-wider text-left border-collapse table-fixed min-w-[1200px]">
+                    <thead>
+                        <tr className="bg-gray-50 border-b border-gray-100">
+                            <th className="p-3 w-10 text-center"><input type="checkbox" onChange={e=>setSel(e.target.checked?new Set(orders.map(o=>o.id)):new Set())}/></th>
+                            {['Status','Date','Instagram','Name'].map(l=>(
+                                <th key={l} onClick={()=>setSort({key:l.toLowerCase().replace(' ','Id'), dir:sort.dir==='asc'?'desc':'asc'})} className="p-3 font-bold text-gray-400 cursor-pointer hover:text-black transition-colors">
+                                    <div className="flex items-center gap-1">{l}<ArrowUpDown size={10}/></div>
+                                </th>
+                            ))}
+                            <th className="p-3 text-gray-400 w-[60px]">Contact</th>
+                            <th className="p-3 text-gray-400 w-[100px]">Address</th>
+                            <th className="p-3 text-gray-400 w-[120px]">Item</th>
+                            <th className="p-3 text-gray-400 w-[50px] text-center">Size</th>
+                            <th className="p-3 text-gray-400 w-[300px]">Admin Memo</th>
+                            <th className="p-3 w-32"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {sorted.map(o=>(
+                            <tr key={o.id} className="border-b border-gray-50 hover:bg-gray-50 group">
+                                <td className="p-3 text-center"><input type="checkbox" checked={sel.has(o.id)} onChange={()=>toggleSelection(o.id)}/></td>
+                                <td className="p-3"><select value={o.status} onChange={e=>updateOrder(o.id,'status',e.target.value)} className={`bg-transparent font-bold focus:outline-none ${o.status==='Shipped'?'text-green-600':'text-orange-400'}`}><option value="Preparing">Preparing</option><option value="Shipped">Shipped</option></select></td>
+                                <td className="p-3 text-gray-400">{o.status==='Shipped'?o.shippedDate:o.date}</td>
+                                <td className="p-3 font-medium">{o.instagramId}</td>
+                                <td className="p-3">{o.name}</td>
+                                <td className="p-3 text-gray-400 truncate" title={o.phone}>{o.phone?.slice(0,3)}...</td>
+                                <td className="p-3 text-gray-400 truncate" title={o.address}>{o.address?.slice(0,10)}...</td>
+                                <td className="p-3"><input type="text" value={o.productName || ''} onChange={e=>updateOrder(o.id,'productName',e.target.value)} className="w-full bg-transparent focus:bg-gray-50 border-b border-transparent focus:border-gray-100 p-1"/></td>
+                                <td className="p-3"><input type="text" value={o.size || ''} onChange={e=>updateOrder(o.id,'size',e.target.value)} className="w-full bg-transparent text-center focus:bg-gray-50 border-b border-transparent focus:border-gray-100 p-1"/></td>
+                                <td className="p-3"><textarea value={o.adminMemo||''} onChange={e=>updateOrder(o.id,'adminMemo',e.target.value)} placeholder="..." className="w-full h-8 bg-transparent focus:bg-gray-50 border border-transparent focus:border-gray-100 resize-none no-scrollbar p-1 rounded-sm"/></td>
+                                <td className="p-3 flex items-center gap-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button onClick={()=>{ const copy={...o,id:Math.random().toString(36).substr(2,9),date:'추가 제품',productName:'',size:''}; setOrders([copy,...orders]); showMsg('Row Duplicated'); }} className="text-gray-400 hover:text-black transition-colors" title="Duplicate Row"><Copy size={14}/></button>
+                                    <button onClick={()=>setOrders(orders.filter((it:any)=>it.id!==o.id))} className="text-gray-200 hover:text-red-500 transition-colors"><Trash2 size={14}/></button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
+const ReportTab = ({ collection }: any) => {
+    const COLORS = ['#6366f1', '#10b981', '#3b82f6', '#f59e0b', '#ec4899', '#8b5cf6'];
+    const stats = useMemo(() => {
+        const p: Record<string, number> = {}; 
+        (collection.orders || []).forEach((o:any)=>{ p[o.productName]=(p[o.productName]||0)+1; });
+        return Object.entries(p).map(([name, value])=>({ 
+            name: name || 'N/A', 
+            value, 
+            pct: ((value/((collection.orders || []).length || 1))*100).toFixed(1) 
+        })).sort((a,b)=>b.value-a.value);
+    }, [collection]);
+
+    return (
+        <div className="space-y-16 animate-fade-in py-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                <div className="space-y-8">
+                    <h3 className="text-[10px] font-bold uppercase tracking-widest border-b border-gray-100 pb-2">Seeding Reach</h3>
+                    <div className="h-[340px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={stats}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9"/>
+                                <XAxis dataKey="name" tick={{fontSize:8, fill:'#94a3b8'}} axisLine={false} tickLine={false}/>
+                                <YAxis tick={{fontSize:8, fill:'#94a3b8'}} axisLine={false} tickLine={false}/>
+                                <Tooltip cursor={{fill:'#f8fafc'}} contentStyle={{fontSize: '10px', textTransform: 'uppercase'}}/>
+                                <Bar dataKey="value" radius={[2, 2, 0, 0]}>
+                                    {stats.map((_, i)=><Cell key={i} fill={COLORS[i%COLORS.length]}/>)}
+                                </Bar>
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+                <div className="flex flex-col justify-center items-center text-center space-y-10">
+                    <div className="p-12 border-[10px] border-black inline-block rounded-sm animate-fade-in"><p className="text-[10px] uppercase tracking-[0.4em] text-gray-400 mb-4 font-bold">Total Items Distributed</p><p className="text-8xl font-light italic">{(collection.orders || []).length}</p></div>
+                    <div className="space-y-4 w-full max-w-xs">{stats.slice(0, 5).map((s,i)=><div key={i} className="flex justify-between text-[10px] uppercase tracking-widest font-bold"><span className="text-gray-400">{s.name}</span><span>{s.pct}%</span></div>)}</div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// --- Application Entry ---
+const App = () => {
+    const [collections, setCollections] = useState<any[]>(() => {
+        const saved = localStorage.getItem('nuuanu_collections_v4');
+        return saved ? JSON.parse(saved) : [];
+    });
+
+    const [adminConfig, setAdminConfig] = useState(() => {
+        const saved = localStorage.getItem('nuuanu_admin_v4');
+        return saved ? JSON.parse(saved) : { password: 'ADMIN', recoveryPhrase: 'nuuanu' };
+    });
+
+    const [session, setSession] = useState<any>(null);
+
+    const saveCollections = (data: any) => {
+        try {
+            localStorage.setItem('nuuanu_collections_v4', JSON.stringify(data));
+            return true;
+        } catch (e) {
+            console.error('Storage full', e);
+            return false;
+        }
+    };
+
+    const saveAdminConfig = (data: any) => {
+        try {
+            localStorage.setItem('nuuanu_admin_v4', JSON.stringify(data));
+            return true;
+        } catch (e) {
+            return false;
+        }
+    };
+
+    const handleLogin = useCallback((code: string) => {
+        const input = code.trim().toUpperCase();
+        if (input === adminConfig.password.toUpperCase()) {
+            setSession({ role: 'admin' });
+            return true;
+        }
+        for (const col of collections) {
+            const match = (col.accessCodes || []).find((c: any) => c.code.toUpperCase() === input);
+            if (match) {
+                setSession({ role: 'influencer', collectionId: col.id, limit: match.limit });
+                return true;
+            }
+        }
+        return false;
+    }, [adminConfig, collections]);
+
+    const handleResetPassword = useCallback((phrase: string) => {
+        if (phrase.trim().toLowerCase() === adminConfig.recoveryPhrase.toLowerCase()) {
+            setAdminConfig((prev: any) => ({ ...prev, password: 'ADMIN' }));
+            return true;
+        }
+        return false;
+    }, [adminConfig]);
+
+    const updateCollection = (updated: any, newAdmin: any = null) => {
+        const nextCols = collections.map(c => c.id === updated.id ? updated : c);
+        const colOk = saveCollections(nextCols);
+        let adminOk = true;
+        if (newAdmin) adminOk = saveAdminConfig(newAdmin);
+        
+        if (colOk && adminOk) {
+            setCollections(nextCols);
+            if (newAdmin) setAdminConfig(newAdmin);
+            return true;
+        }
+        return false;
+    };
+
+    if (!session) return <LoginPage onLogin={handleLogin} onReset={handleResetPassword} />;
+
+    if (session.role === 'admin') {
+        return (
+            <AdminDashboard 
+                collections={collections}
+                adminConfig={adminConfig}
+                onUpdateAdminConfig={setAdminConfig}
+                onUpdateCollection={updateCollection}
+                onAddCollection={(newCol: any) => {
+                    const next = [...collections, newCol];
+                    if (saveCollections(next)) setCollections(next);
+                }}
+                onLogout={() => setSession(null)}
+            />
+        );
+    }
+
+    const currentCollection = collections.find(c => c.id === session.collectionId);
+    if (!currentCollection) return null;
+
+    return (
+        <InfluencerPage 
+            collection={currentCollection}
+            limit={session.limit}
+            onLogout={() => setSession(null)}
+            onOrderSubmit={(newOrders: any) => {
+                const updated = { ...currentCollection, orders: [...(currentCollection.orders || []), ...newOrders] };
+                updateCollection(updated);
+            }}
+        />
+    );
+};
+
+const root = createRoot(document.getElementById('root')!);
+root.render(<App />);
