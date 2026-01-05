@@ -1,0 +1,7 @@
+{
+  "name": "Luxury Brand Seeding Management Tool",
+  "description": "A high-end minimal management platform for fashion brands to manage influencer seeding, lookbooks, and product distributions.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
